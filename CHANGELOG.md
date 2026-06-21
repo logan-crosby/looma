@@ -4,6 +4,36 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
+## [1.6.0] - 2026-06-21
+
+The daily loop. Driven by a usage analysis (DAILY_USAGE_REPORT.md); product-fit
+summary in LOOMA_PRODUCT_FIT_REPORT.md.
+
+### Added
+- **`looma today`** (and bare `looma`) - the daily driver: what you're working on,
+  what changed recently (sessions + commits + working tree), what's blocked, what
+  to do next, plus the other repos you touched recently with their next step.
+  Benchmarked at 0.89/4 daily completeness vs resume 0.55 / brief 0.61.
+- **`looma weekly`** - cross-project retrospective: worked on, shipped (commits),
+  decisions, unresolved blockers. Understand your week in under 2 minutes.
+- MCP `today` and `weekly` tools (9 tools total).
+
+### Changed
+- **Bare `looma` runs `today`** - the daily habit costs zero keystrokes beyond
+  the binary name.
+- **`init` is now optional** - every command auto-creates and migrates the store,
+  so a brand-new machine works without it.
+- `doctor` ends with a concrete next step; the empty daily view shows a quickstart;
+  first ingest prints a progress hint with a `--limit` fast-path.
+- MCP tool output is ASCII-folded centrally (no transcript emoji/smart-quotes in
+  another agent's context).
+
+### Fixed
+- `dirty_files` truncated every modified path by one character ("looma/cli.py" ->
+  "ooma/cli.py") because the porcelain status field's leading space was stripped.
+  Fixed with a NUL-delimited parse. This corrupted "what changed" everywhere.
+- `looks_like_code` now also drops diff hunks (@@) and comment/heading lines.
+
 ## [1.5.0] - 2026-06-21
 
 Refinement cycle: make Looma feel indispensable. Driven by a real-corpus

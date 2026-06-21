@@ -1,6 +1,6 @@
 [project]
 name = "looma"
-version = "1.5.0"
+version = "1.6.0"
 description = "Looma turns coding-agent history into resumable, git-anchored project context. Local-first."
 readme = "README.md"
 requires-python = ">=3.10"

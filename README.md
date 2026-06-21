@@ -36,12 +36,17 @@ Prefer no install? Run `python3 -m looma <cmd>` from the repo.
 
 ```bash
 looma doctor              # check Python, FTS5, Claude history, git, data dir
-looma ingest --once       # index your Claude Code history (or: --once --limit 25)
-looma brief               # 60-second orientation: active work, decisions, risks, next step
-looma work                # list WorkItems for the current repo, with confidence
+looma ingest              # index your coding-agent history (auto-creates the DB)
+looma                     # the daily driver: working on / changed / blocked / next
+looma weekly              # the week across all repos: worked on / shipped / decisions
 looma resume "auth"       # reconstruct context for a goal
 looma explain "auth"      # why a WorkItem exists, how it evolved, what shaped it
+looma ask "why postgres"  # search validated memory + work items
 ```
+
+`looma` with no arguments runs the daily view (`today`) for the current repo,
+then lists the other repos you touched recently, each with its next step - so a
+context switch is one command.
 
 `looma resume "auth"` returns the active auth work - the WorkItem, its constraints,
 unfinished todos, affecting bugs, recent sessions, the linked commits and files,
@@ -101,9 +106,10 @@ Control it explicitly with `LOOMA_EXTRACTOR=auto|heuristic|llm` (default `auto`)
 
 ## Current Status
 
-**v1.5.0** - refinement of the solo-developer milestone, driven by a real-corpus
-evaluation ([REAL_WORLD_EVALUATION.md](REAL_WORLD_EVALUATION.md); summary in
-[LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
+**v1.6.0** - the daily loop: `looma today` (bare `looma`) and `looma weekly`,
+driven by a usage analysis ([DAILY_USAGE_REPORT.md](DAILY_USAGE_REPORT.md);
+product-fit summary in [LOOMA_PRODUCT_FIT_REPORT.md](LOOMA_PRODUCT_FIT_REPORT.md)).
+Built on the v1.5 refinement ([LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
 
 ### Works today
 
@@ -120,17 +126,23 @@ evaluation ([REAL_WORLD_EVALUATION.md](REAL_WORLD_EVALUATION.md); summary in
 - Evaluation: `looma benchmark [--compare|--retrieval]` (P/R/F1, retrieval recall)
 - Human corrections: `looma correct merge|split|rename|promote|reject|false-positive|undo`
   (ledgered, replayable, override automated inference)
+- **Daily driver**: `looma` / `looma today` (working on / changed / blocked / next,
+  plus the other repos you touched recently) and `looma weekly` (the week across
+  all repos: worked on, shipped, decisions, blockers)
 - **Brief**: `looma brief` (60-second project orientation: active work, decisions,
   risks, blockers, recent commits, suggested next work)
 - **Timeline**: `looma timeline` (feature evolution over time)
 - **Explain**: `looma explain <work>` (why a WorkItem exists, how it evolved, which
   decisions shaped it, what changed)
 - **MCP server**: `looma mcp` (any agent can consume Looma context, local stdio;
-  tools: resume_work, brief, ask, timeline, explain, list_work, recall)
+  tools: today, weekly, resume_work, brief, ask, timeline, explain, list_work,
+  recall). Hands an agent a grounded orientation in 1-3% of the raw-transcript
+  tokens (32x-101x compression).
 - **Watcher daemon**: `looma daemon` (stays current automatically)
 - Graph health with degradation warnings: `looma status --health`
-- CLI: `init`, `ingest`, `brief`, `work`, `resume`, `ask`, `timeline`, `explain`,
-  `status`, `doctor`, `reset`, `benchmark`, `correct`, `reprocess`, `mcp`, `daemon`
+- CLI: `today` (bare `looma`), `weekly`, `ingest`, `brief`, `resume`, `ask`,
+  `explain`, `timeline`, `work`, `status`, `doctor`, `reset`, `benchmark`,
+  `correct`, `reprocess`, `mcp`, `daemon`, `init`
 
 ### Planned (not yet built)
 
