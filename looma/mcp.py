@@ -1,7 +1,7 @@
 """Minimal MCP server (goal Phase 4) - lets any MCP agent consume Looma context.
 
 Pure stdlib: JSON-RPC 2.0 over newline-delimited stdio. No dependency, no network,
-no hosted service - fully local. Tools: resume_work, brief, ask, timeline, list_work, recall.
+no hosted service - fully local. Tools: resume_work, brief, ask, timeline, explain, list_work, recall.
 Run via `looma mcp` (typically launched by the agent inside the project directory).
 """
 
@@ -35,6 +35,10 @@ TOOLS = [
                      "query": {"type": "string"}}, "required": ["query"]}},
     {"name": "timeline",
      "description": "Show a work item's evolution (decisions, commits, bugs, sessions) over time.",
+     "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT,
+                     "work": {"type": "string", "description": "work item id (#5) or goal text"}}}},
+    {"name": "explain",
+     "description": "Explain why a work item exists, how it evolved, which decisions shaped it, and what changed.",
      "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT,
                      "work": {"type": "string", "description": "work item id (#5) or goal text"}}}},
     {"name": "list_work",
@@ -114,6 +118,24 @@ class _Server:
         if not wi:
             return "No work items."
         return timeline.format_timeline(wi, timeline.build(self.store, proj["id"], wi["id"]))
+
+    def explain(self, a):
+        from . import explain as explain_mod
+        from .correction import resolve_workitem
+        proj = self._project(a)
+        if not proj:
+            return self._no_project(a)
+        token = a.get("work", "")
+        wi = resolve_workitem(self.store, proj["id"], token) if token else None
+        if not wi and token:
+            hits = match_work_items(self.store, proj["id"], token, vstore=self.vstore)
+            wi = hits[0] if hits else None
+        if not wi:
+            wis = self.store.project_work_items(proj["id"])
+            wi = wis[0] if wis else None
+        if not wi:
+            return "No work items."
+        return explain_mod.format_explain(explain_mod.build(self.store, proj["id"], wi))
 
     def list_work(self, a):
         proj = self._project(a)

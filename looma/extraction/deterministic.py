@@ -84,11 +84,13 @@ def session_artifacts(messages: list[dict], project_root: Optional[str], validat
                     if _GIT_CMD_HINT.search(cmd):
                         raw_shas.update(_SHA_RE.findall(cmd))
         text = m.get("text") or ""
-        # path tokens mentioned in prose, validated against the tree
-        for tok in _PATH_RE.findall(text):
-            rel = _rel_under_root(tok, project_root)
-            if rel and os.path.exists(os.path.join(project_root, rel)):
-                files.add(rel)
+        # path tokens mentioned in prose, validated against the tree (only when we
+        # have a real root on disk - rootless projects skip the existence check)
+        if project_root:
+            for tok in _PATH_RE.findall(text):
+                rel = _rel_under_root(tok, project_root)
+                if rel and os.path.exists(os.path.join(project_root, rel)):
+                    files.add(rel)
         # SHAs from recognizable git output only
         for m2 in _GIT_OUTPUT_SHA.finditer(text):
             raw_shas.add(m2.group(1))

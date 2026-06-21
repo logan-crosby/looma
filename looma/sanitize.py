@@ -59,7 +59,7 @@ def is_noise(text: str) -> bool:
 _CODE_FRAGMENT = re.compile(
     r"(^\s*[+\-]\s)|(^\s*\+)|//|[{}]|=>|;\s*$|`|</|/>|::|==|!=|\)\s*\{|<[A-Za-z][\w-]*[\s/>]|className=|"
     r"\b(?:const|let|await|function|return|def|import|class|console|throw new)\b|"
-    r"Date\.now|\b\w+\([^)]*\)\s*[:{]"
+    r"Date\.now|\b\w+\([^)]*\)\s*[:{]|\b\w+\.\w+\s*\("  # dotted method call, e.g. store.set_defaults(
 )
 _ALPHA_RUN = re.compile(r"[A-Za-z]{3,}")
 _FILE_EXT = re.compile(r"\.[A-Za-z0-9]{1,5}$")

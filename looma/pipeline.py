@@ -183,7 +183,11 @@ def _rebuild_project(store: Store, project: dict, extractor=None) -> dict:
     project_node = store.node_id(pid, "project", pid)
     for b in builders:
         has_commit = any(session_artifacts[sid]["shas"] for sid in b["members"])
-        lifecycle = "active" if (has_commit or len(b["members"]) >= 2) else "candidate"
+        # A single session that actually edited multiple files is real work, not a
+        # tentative candidate. Without this, 89% of solo-dev work stayed 'candidate'
+        # (Phase 1) - the candidate tier should mean thin/uncertain, not "solo".
+        substantive = len(b["files"]) >= 2
+        lifecycle = "active" if (has_commit or len(b["members"]) >= 2 or substantive) else "candidate"
         file_sets = [set(session_artifacts[sid]["files"]) for sid in b["members"]]
         conf = confidence.score(
             file_overlap=confidence.cohesion(file_sets),

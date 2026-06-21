@@ -10,15 +10,34 @@ import re
 from typing import Optional
 
 from .. import config
-from ..sanitize import is_noise, strip_injected
+from ..sanitize import is_noise, looks_like_code, strip_injected
 from ..util import jaccard, prettify_label, text_sim
 
 _INTENT = re.compile(
     r"(?i)\b(implement|build|create|add|fix|refactor|migrate|investigate|debug|continue|set up|wire up)\b\s+(.{3,60})"
 )
 _CODEISH = re.compile(r"[{}<>=+|;`\\]")
+# SQL/DDL and dotted-identifier / quoted-ternary patterns the verb regex would
+# otherwise scrape out of pasted code, docs, and JSX (Phase 1: a big source of
+# garbage titles like 'Create TABLE IF NOT EXISTS Projects').
+_NOT_INTENT = re.compile(
+    r"(?i)\b(?:table|select|insert into|values|from|where|join|index|constraint|"
+    r"primary key|foreign key|not null|varchar|integer)\b"
+    r"|\w\.\w"                 # dotted identifier, e.g. store.set_defaults
+    r'|"\s*[:?]'              # quoted ternary / JSX string literal
+    r"|\)\.\w"                # method chain
+)
 _LEAD_FILLER = re.compile(r"(?i)^(?:the|a|an|to|now|then|please|out|up|in|on|this|that|it|all)\b\s*")
 _ALPHA_TOK = re.compile(r"[A-Za-z]{3,}")
+# path segments too generic to name an effort after
+_GENERIC_SEG = {
+    "src", "lib", "app", "apps", "packages", "package", "test", "tests", "dist",
+    "build", "node_modules", "components", "component", "pages", "page", "api",
+    "utils", "util", "scripts", "script", "docs", "doc", "public", "static",
+    "styles", "assets", "config", "index", "main", "__pycache__", "backend",
+    "frontend", "server", "client", "core",
+}
+_SEG_SPLIT = re.compile(r"[/\\]")
 _KIND = {
     "fix": "bugfix", "debug": "bugfix",
     "refactor": "refactor",
@@ -39,6 +58,10 @@ def _intent(messages: list[dict]) -> tuple[Optional[str], str]:
             continue
         for line in text.splitlines():
             line = line.strip()
+            # whole-line rejects: code/diff/log lines and pasted SQL/JSX never
+            # carry the user's intent, even when they contain an imperative verb.
+            if looks_like_code(line) or _NOT_INTENT.search(line):
+                continue
             match = _INTENT.search(line)
             if not match:
                 continue
@@ -46,27 +69,46 @@ def _intent(messages: list[dict]) -> tuple[Optional[str], str]:
             verb = verb_phrase.split()[0]
             tail = _STOP_TAIL.sub("", match.group(2)).strip().strip("`\"'.,:;()[]")
             tail = _LEAD_FILLER.sub("", tail).strip()
-            # reject code/diff fragments and tails without real words
-            if not tail or _CODEISH.search(tail) or len(_ALPHA_TOK.findall(tail)) < 1:
+            # reject code fragments and tails without at least two real words
+            if (not tail or _CODEISH.search(tail) or _NOT_INTENT.search(tail)
+                    or len(_ALPHA_TOK.findall(tail)) < 2):
                 continue
             kind = _KIND.get(verb, "feature")
             return f"{verb_phrase} {tail}".strip()[:60], kind
     return None, "feature"
 
 
+def _salient_segment(files: list[str]) -> Optional[str]:
+    """Most frequent meaningful path segment (dir or filename stem), skipping
+    generic scaffolding dirs - so a generic top dir does not name the effort."""
+    counts: dict[str, int] = {}
+    for f in files:
+        parts = [p for p in _SEG_SPLIT.split(f) if p]
+        for i, p in enumerate(parts):
+            seg = p
+            if i == len(parts) - 1:  # filename -> use stem
+                seg = p.rsplit(".", 1)[0]
+            low = seg.lower()
+            if not seg or low in _GENERIC_SEG or low.startswith(".") or len(seg) < 3:
+                continue
+            counts[seg] = counts.get(seg, 0) + 1
+    if not counts:
+        return None
+    # prefer frequency, then longer (more specific) names
+    return sorted(counts.items(), key=lambda kv: (kv[1], len(kv[0])), reverse=True)[0][0]
+
+
 def _title_from(label: Optional[str], files: list[str], branch: Optional[str]) -> str:
     if label:
         return prettify_label(label)
-    if files:
-        # dominant top-level directory
-        tops = {}
-        for f in files:
-            top = f.split("/")[0]
-            tops[top] = tops.get(top, 0) + 1
-        dom = max(tops, key=tops.get)
-        return f"Work in {dom}/"
+    seg = _salient_segment(files) if files else None
+    if seg:
+        return f"Work on {prettify_label(seg.replace('-', ' ').replace('_', ' '))}"
     if branch and branch.lower() not in _GENERIC_BRANCH:
         return f"Work on {branch}"
+    if files:
+        top = files[0].split("/")[0]
+        return f"Work in {top}/"
     return "Untitled work"
 
 

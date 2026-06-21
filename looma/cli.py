@@ -310,6 +310,34 @@ def cmd_timeline(args) -> int:
     return 0
 
 
+def cmd_explain(args) -> int:
+    from . import explain as ex
+    from .correction import resolve_workitem
+    from .retrieval.match import match_work_items
+    store = _open_store(args)
+    proj = _pick_project(store, args)
+    if not proj:
+        store.close()
+        return 1
+    token = " ".join(args.work or [])
+    wi = None
+    if token:
+        wi = resolve_workitem(store, proj["id"], token)  # '#5' / '5'
+        if not wi:
+            hits = match_work_items(store, proj["id"], token, vstore=_vstore(args))
+            wi = hits[0] if hits else None
+    else:
+        wis = store.project_work_items(proj["id"])
+        wi = wis[0] if wis else None
+    if not wi:
+        print(f"no work item matching '{token}' (see `looma work`)", file=sys.stderr)
+        store.close()
+        return 1
+    print(ex.format_explain(ex.build(store, proj["id"], wi)))
+    store.close()
+    return 0
+
+
 def cmd_ask(args) -> int:
     store = _open_store(args)
     proj = _pick_project(store, args)
@@ -546,6 +574,11 @@ def build_parser() -> argparse.ArgumentParser:
     ptl.add_argument("work", nargs="*", help="work item id (#5) or goal text")
     ptl.add_argument("--project", help="project canonical key (default: current dir)")
     ptl.set_defaults(func=cmd_timeline)
+
+    pex = sub.add_parser("explain", parents=[common], help="explain why a work item exists and how it evolved")
+    pex.add_argument("work", nargs="*", help="work item id (#5) or goal text")
+    pex.add_argument("--project", help="project canonical key (default: current dir)")
+    pex.set_defaults(func=cmd_explain)
 
     pa = sub.add_parser("ask", parents=[common], help="search validated memory + work items")
     pa.add_argument("query", nargs="*", help="question / keywords")

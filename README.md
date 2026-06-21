@@ -37,8 +37,10 @@ Prefer no install? Run `python3 -m looma <cmd>` from the repo.
 ```bash
 looma doctor              # check Python, FTS5, Claude history, git, data dir
 looma ingest --once       # index your Claude Code history (or: --once --limit 25)
+looma brief               # 60-second orientation: active work, decisions, risks, next step
 looma work                # list WorkItems for the current repo, with confidence
 looma resume "auth"       # reconstruct context for a goal
+looma explain "auth"      # why a WorkItem exists, how it evolved, what shaped it
 ```
 
 `looma resume "auth"` returns the active auth work - the WorkItem, its constraints,
@@ -99,7 +101,8 @@ Control it explicitly with `LOOMA_EXTRACTOR=auto|heuristic|llm` (default `auto`)
 
 ## Current Status
 
-**v1.0.0 (solo-developer milestone).**
+**v1.0.0 (solo-developer milestone); refining toward v1.5** (see
+[REAL_WORLD_EVALUATION.md](REAL_WORLD_EVALUATION.md) for the evaluation driving it).
 
 ### Works today
 
@@ -116,12 +119,17 @@ Control it explicitly with `LOOMA_EXTRACTOR=auto|heuristic|llm` (default `auto`)
 - Evaluation: `looma benchmark [--compare|--retrieval]` (P/R/F1, retrieval recall)
 - Human corrections: `looma correct merge|split|rename|promote|reject|false-positive|undo`
   (ledgered, replayable, override automated inference)
+- **Brief**: `looma brief` (60-second project orientation: active work, decisions,
+  risks, blockers, recent commits, suggested next work)
 - **Timeline**: `looma timeline` (feature evolution over time)
-- **MCP server**: `looma mcp` (any agent can consume Looma context, local stdio)
+- **Explain**: `looma explain <work>` (why a WorkItem exists, how it evolved, which
+  decisions shaped it, what changed)
+- **MCP server**: `looma mcp` (any agent can consume Looma context, local stdio;
+  tools: resume_work, brief, ask, timeline, explain, list_work, recall)
 - **Watcher daemon**: `looma daemon` (stays current automatically)
 - Graph health with degradation warnings: `looma status --health`
-- CLI: `init`, `ingest`, `work`, `resume`, `ask`, `timeline`, `status`, `doctor`,
-  `reset`, `benchmark`, `correct`, `reprocess`, `mcp`, `daemon`
+- CLI: `init`, `ingest`, `brief`, `work`, `resume`, `ask`, `timeline`, `explain`,
+  `status`, `doctor`, `reset`, `benchmark`, `correct`, `reprocess`, `mcp`, `daemon`
 
 ### Planned (not yet built)
 
