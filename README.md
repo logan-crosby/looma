@@ -13,7 +13,7 @@ Instead of searching transcripts, Looma reconstructs:
 
 Local-first. No cloud. No API keys.
 
-> Status: **alpha** (v0.1.0a1). Works today on Claude Code history. Honest about
+> Status: **v1.0.0** (solo-dev milestone). Works today on Claude Code history. Honest about
 > what is real vs heuristic - see [Current Status](#current-status) and
 > [RELEASE_ALPHA.md](RELEASE_ALPHA.md).
 
@@ -21,7 +21,7 @@ Local-first. No cloud. No API keys.
 
 ## Install
 
-Alpha, from source (standard-library Python 3.10+, zero third-party dependencies):
+From source (standard-library Python 3.10+, zero third-party dependencies):
 
 ```bash
 git clone https://github.com/devYRPauli/looma
@@ -99,39 +99,40 @@ Control it explicitly with `LOOMA_EXTRACTOR=auto|heuristic|llm` (default `auto`)
 
 ## Current Status
 
-**Alpha.**
+**v1.0.0 (solo-developer milestone).**
 
 ### Works today
 
-- Claude Code history ingestion (idempotent)
-- WorkItem extraction and resolution
-- Candidate-memory extraction (heuristic)
+- **Multi-agent ingestion**: Claude Code, Codex, and Cursor (idempotent); sessions
+  from different agents on the same repo merge into the same WorkItems
+- WorkItem extraction and resolution (agglomerative file-overlap merging)
 - Confidence scoring, surfaced everywhere
 - Git-anchored context reconstruction (validated commits, branches, files)
 - WorkItem-first resume bundles with explicit uncertainty handling
-- Local SQLite storage + FTS5 lexical retrieval
-- Evaluation: `looma benchmark [--compare]` (precision/recall/F1 on a golden set)
+- **Hybrid retrieval**: graph + FTS5 + optional semantic vectors (sqlite-vec)
 - Optional fully-local LLM extractor, **auto-detected** when a local model server is
   running (F1 0.96 vs 0.69 on the benchmark); the stdlib heuristic stays the
   zero-dependency default and fallback
+- Evaluation: `looma benchmark [--compare|--retrieval]` (P/R/F1, retrieval recall)
 - Human corrections: `looma correct merge|split|rename|promote|reject|false-positive|undo`
   (ledgered, replayable, override automated inference)
-- Graph health: `looma status --health`
-- CLI: `init`, `ingest`, `work`, `resume`, `ask`, `status`, `doctor`, `reset`,
-  `benchmark`, `correct`, `reprocess`
+- **Timeline**: `looma timeline` (feature evolution over time)
+- **MCP server**: `looma mcp` (any agent can consume Looma context, local stdio)
+- **Watcher daemon**: `looma daemon` (stays current automatically)
+- Graph health with degradation warnings: `looma status --health`
+- CLI: `init`, `ingest`, `work`, `resume`, `ask`, `timeline`, `status`, `doctor`,
+  `reset`, `benchmark`, `correct`, `reprocess`, `mcp`, `daemon`
 
 ### Planned (not yet built)
 
-- Cross-agent support: Codex, Cursor, Gemini, Windsurf, OpenCode
-- MCP integration (inject resume bundles into any agent)
-- Timeline views (feature evolution over time)
-- Semantic retrieval (sqlite-vec behind the existing VectorStore interface)
+- More adapters: Gemini, Windsurf, OpenCode
+- Route WorkItem titles through the LLM extractor (currently candidate memories only)
 - Local UI
 
-The line between these is deliberate: today's extraction is heuristic and will let
-the occasional noisy item through. Confidence and promotion down-rank it, and the
-planned local-LLM engine is the precision upgrade. Details in
-[IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md).
+Extraction is heuristic by default and will let the occasional noisy item through;
+confidence + promotion down-rank it, and the auto-detected local LLM extractor is the
+precision upgrade. Details in [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) and
+[V1_READINESS.md](V1_READINESS.md).
 
 ## Why not just search transcripts
 
@@ -158,7 +159,7 @@ docs/         launch assets (screenshots, demo)
 
 ## Contributing
 
-Early alpha - feedback, bug reports, and small PRs welcome. See
+Feedback, bug reports, and small PRs welcome. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License

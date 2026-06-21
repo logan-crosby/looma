@@ -229,9 +229,37 @@ def connect(db_path) -> sqlite3.Connection:
     return conn
 
 
+# Columns added after the first public schema; ALTERed in for old DBs (alpha -> v1).
+_EXTRA_COLUMNS = {
+    "work_items": [("branch", "TEXT"), ("name_locked", "INTEGER DEFAULT 0"),
+                   ("confidence", "REAL DEFAULT 0")],
+    "candidate_memories": [("confidence", "REAL DEFAULT 0")],
+    "entities": [("confidence", "REAL DEFAULT 0"), ("work_item_id", "INTEGER"),
+                 ("promoted_from_candidate_id", "INTEGER")],
+    "summaries": [("work_item_id", "INTEGER")],
+}
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    for table, cols in _EXTRA_COLUMNS.items():
+        try:
+            existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        except sqlite3.Error:
+            continue
+        if not existing:
+            continue
+        for col, typ in cols:
+            if col not in existing:
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+                except sqlite3.Error:
+                    pass
+
+
 def migrate(conn: sqlite3.Connection) -> None:
     for stmt in SCHEMA:
         conn.execute(stmt)
+    _ensure_columns(conn)  # forward-compatible upgrades for pre-v1 databases
     conn.execute(
         "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', ?)",
         (str(SCHEMA_VERSION),),

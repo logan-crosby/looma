@@ -1,6 +1,6 @@
 [project]
 name = "looma"
-version = "0.1.0a1"
+version = "1.0.0"
 description = "Looma turns coding-agent history into resumable, git-anchored project context. Local-first."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -10,7 +10,7 @@ keywords = ["memory", "agents", "claude-code", "local-first", "knowledge-graph",
 dependencies = []
 
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Environment :: Console",
     "Intended Audience :: Developers",

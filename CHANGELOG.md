@@ -4,9 +4,23 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
-## [Unreleased]
+## [1.0.0] - 2026-06-21
 
-Focus: extraction quality, trust, and evaluation - not feature count.
+First "complete v1" milestone for solo developers. See LOOMA_V1_REPORT.md.
+
+### Added (v1 milestone)
+- **Multi-agent ingestion**: Codex + Cursor adapters alongside Claude Code; sessions
+  merge across agents on the same repo. Per-source ingest reporting.
+- **Hybrid retrieval**: optional sqlite-vec semantic vectors fused with FTS + graph
+  (FTS stays the zero-dependency default). Retrieval recall@3 0.62 -> 1.00.
+- **Resolution fix**: agglomerative file-overlap merge - unresolved RELATED 158 -> 3,
+  work items 316 -> 159 on real data.
+- `looma timeline` (WorkItem evolution), `looma mcp` (stdlib MCP server),
+  `looma daemon` (auto-stay-current), `looma status --health` degradation warnings,
+  `looma benchmark --retrieval`.
+- Forward-compatible column migrations for pre-v1 databases.
+
+### Earlier in this line: extraction quality, trust, and evaluation
 
 ### Added
 - **Auto-detected local LLM extraction.** `LOOMA_EXTRACTOR=auto` (now the default)
