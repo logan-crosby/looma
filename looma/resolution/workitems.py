@@ -116,13 +116,71 @@ def resolve(signals: list[dict]) -> list[dict]:
         if best_i >= 0 and best_score >= config.RESOLVE_HIGH:
             _absorb(workitems[best_i], sig)
             continue
+        workitems.append(_new_workitem(sig))
 
-        new_wi = _new_workitem(sig)
-        if best_i >= 0 and best_score >= config.RESOLVE_LOW:
-            # near-match but below the HIGH bar: keep separate, link RELATED (4.4)
-            new_wi["related"].append(best_i)
-        workitems.append(new_wi)
+    # Phase 1 fix: agglomerative merge of WorkItems editing substantially the same
+    # files (the dominant under-merging cause), then RELATED only for moderate overlap.
+    workitems = _merge_pass(workitems)
+    _compute_related(workitems)
     return workitems
+
+
+def _file_jac(a: set, b: set) -> float:
+    return jaccard(a, b)
+
+
+def _merge_pass(builders: list[dict]) -> list[dict]:
+    """Union-find merge any two builders with file overlap >= MERGE_FILE_JACCARD."""
+    n = len(builders)
+    if n < 2:
+        return builders
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if _file_jac(builders[i]["files"], builders[j]["files"]) >= config.MERGE_FILE_JACCARD:
+                ri, rj = find(i), find(j)
+                if ri != rj:
+                    parent[max(ri, rj)] = min(ri, rj)
+
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+    return [_coalesce([builders[k] for k in idxs]) for idxs in groups.values()]
+
+
+def _coalesce(group: list[dict]) -> dict:
+    if len(group) == 1:
+        return group[0]
+    group = sorted(group, key=lambda b: (b.get("started_at") or "", b["title"]))
+    base = dict(group[0])  # earliest builder anchors title/kind/branch
+    base["members"] = sorted({m for b in group for m in b["members"]})
+    base["files"] = set().union(*(b["files"] for b in group))
+    base["aliases"] = set().union(*(b["aliases"] for b in group))
+    base["agents"] = set().union(*(b["agents"] for b in group))
+    starts = [b["started_at"] for b in group if b.get("started_at")]
+    ends = [b["ended_at"] for b in group if b.get("ended_at")]
+    base["started_at"] = min(starts) if starts else None
+    base["ended_at"] = max(ends) if ends else None
+    base["related"] = []
+    return base
+
+
+def _compute_related(builders: list[dict]) -> None:
+    """RELATED links only for genuinely moderate (not merge-worthy) file overlap."""
+    for b in builders:
+        b["related"] = []
+    for i in range(len(builders)):
+        for j in range(i + 1, len(builders)):
+            jac = _file_jac(builders[i]["files"], builders[j]["files"])
+            if config.RELATED_MIN <= jac < config.MERGE_FILE_JACCARD:
+                builders[i]["related"].append(j)
 
 
 def _new_workitem(sig: dict) -> dict:

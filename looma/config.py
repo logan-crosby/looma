@@ -15,6 +15,10 @@ RESUME_MARGIN = 0.15
 # WorkItem resolution thresholds (ARCHITECTURE.md section 4.4).
 RESOLVE_HIGH = 0.62  # assign to existing WorkItem at/above this score
 RESOLVE_LOW = 0.30   # below this -> brand new WorkItem; between -> RELATED link
+# Second-pass agglomerative merge: sessions editing substantially the same files are
+# the same effort. File overlap is the strongest, most reliable signal (Phase 1).
+MERGE_FILE_JACCARD = 0.5   # >= this file overlap -> merge two WorkItems
+RELATED_MIN = 0.2          # [RELATED_MIN, MERGE_FILE_JACCARD) -> a RELATED link, not a merge
 
 
 def home() -> Path:
