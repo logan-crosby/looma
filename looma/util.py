@@ -9,9 +9,9 @@ _WORD = re.compile(r"[a-z0-9]+")
 # Map the common non-ASCII characters that leak in from transcript prose to ASCII
 # so CLI output stays plain-text and copy-pasteable in any terminal.
 _ASCII_MAP = {
-    "‘": "'", "’": "'", "“": '"', "”": '"',
-    "–": "-", "—": "-", "…": "...", " ": " ",
-    "→": "->", "•": "-", "·": "-",
+    "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',  # smart quotes
+    "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u00a0": " ",  # dashes, ellipsis, nbsp
+    "\u2192": "->", "\u2022": "-", "\u00b7": "-",                   # arrow, bullets
 }
 _ASCII_RE = re.compile("|".join(re.escape(k) for k in _ASCII_MAP))
 

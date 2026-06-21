@@ -101,8 +101,9 @@ Control it explicitly with `LOOMA_EXTRACTOR=auto|heuristic|llm` (default `auto`)
 
 ## Current Status
 
-**v1.0.0 (solo-developer milestone); refining toward v1.5** (see
-[REAL_WORLD_EVALUATION.md](REAL_WORLD_EVALUATION.md) for the evaluation driving it).
+**v1.5.0** - refinement of the solo-developer milestone, driven by a real-corpus
+evaluation ([REAL_WORLD_EVALUATION.md](REAL_WORLD_EVALUATION.md); summary in
+[LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
 
 ### Works today
 

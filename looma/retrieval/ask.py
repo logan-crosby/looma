@@ -7,7 +7,7 @@ for the slice - every result still carries provenance + confidence + band.
 
 from .. import config
 from ..sanitize import looks_like_code
-from .match import fts_query
+from .match import fts_query, soft_sim
 
 # Relevance dominates ranking; confidence is a light tie-breaker. Ranking purely
 # by confidence (the old behaviour) let an unrelated conf-0.25 bug outrank a
@@ -16,9 +16,10 @@ _W_REL = 0.75
 _W_CONF = 0.25
 
 
-def _rel_from_rank(i: int) -> float:
-    """Map a 0-based bm25 position to a 0-1 relevance (1.0, 0.5, 0.33, ...)."""
-    return 1.0 / (1 + i)
+def _rel(i: int, query: str, title: str) -> float:
+    """Blend bm25 position with token-coverage of the title, so a high-coverage
+    match ranks well even when bm25 ordering is coarse (matches resume's matcher)."""
+    return max(1.0 / (1 + i), soft_sim(query, title or ""))
 
 
 def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list[dict]:
@@ -61,7 +62,7 @@ def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list
             results.append({
                 "type": "memory", "kind": r["kind"], "title": r["title"],
                 "confidence": conf, "band": config.band(conf),
-                "work_item": r["wi_title"], "_rel": _rel_from_rank(i),
+                "work_item": r["wi_title"], "_rel": _rel(i, query, r["title"]),
             })
     except Exception:
         pass
@@ -80,7 +81,7 @@ def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list
             results.append({
                 "type": "workitem", "kind": r["kind"], "title": r["title"],
                 "confidence": conf, "band": config.band(conf), "work_item": r["title"],
-                "_rel": _rel_from_rank(i),
+                "_rel": _rel(i, query, r["title"]),
             })
     except Exception:
         pass

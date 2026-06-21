@@ -4,6 +4,37 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
+## [1.5.0] - 2026-06-21
+
+Refinement cycle: make Looma feel indispensable. Driven by a real-corpus
+evaluation (REAL_WORLD_EVALUATION.md). See LOOMA_V1_5_REPORT.md.
+
+### Added
+- **`looma brief`** - 60-second project orientation (summary, active work, recent
+  decisions, current risks, open blockers, recent commits, suggested next work).
+- **`looma explain <work>`** - why a WorkItem exists, how it evolved, which
+  decisions shaped it, what changed. MCP `brief` + `explain` tools too.
+
+### Changed
+- **Resume gates on match relevance**, not intrinsic confidence (solo-dev work no
+  longer goes COLD on a perfect match). Matching now scores file paths + linked
+  memories; real next-step inference; no-goal resume picks the most resumable
+  item. goal-match MRR 0.67 -> 1.00; COLD-on-true-match 4/6 -> 0/6; next-step
+  real-rate 0.54 -> 0.72.
+- **WorkItem titles**: intent extraction rejects code/SQL/JSX; "Work on <salient
+  segment>" replaces "Work in <dir>/". Garbage titles 15 -> 0; dir titles 80+ -> 0.
+- **Lifecycle**: a single substantive session is now `active`. Active rate
+  11% -> 46%.
+- **Incremental rebuild**: daemon re-derives only changed repos (one-project
+  rebuild 3.1s vs ~85s full, ~27x).
+- **`ask`** ranks by coverage-weighted relevance blended with confidence.
+- Code/diff-line memories filtered from resume/brief/explain; non-ASCII folded.
+
+### Fixed
+- Crash in `deterministic.session_artifacts` when `project_root` is None
+  (rootless/unknown projects) - the real cause of the original ingest rc=1. Full
+  corpus now rebuilds cleanly (277 -> 325 work items).
+
 ## [1.0.0] - 2026-06-21
 
 First "complete v1" milestone for solo developers. See LOOMA_V1_REPORT.md.
