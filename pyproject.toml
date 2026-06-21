@@ -1,0 +1,36 @@
+[project]
+name = "looma"
+version = "0.1.0a1"
+description = "Looma turns coding-agent history into resumable, git-anchored project context. Local-first."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "devYRPauli" }]
+keywords = ["memory", "agents", "claude-code", "local-first", "knowledge-graph", "sqlite"]
+dependencies = []
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Software Development :: Documentation",
+    "Private :: Do Not Upload",
+]
+
+[project.urls]
+Homepage = "https://github.com/devYRPauli/looma"
+Source = "https://github.com/devYRPauli/looma"
+
+[project.scripts]
+looma = "looma.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["looma*"]

@@ -1,0 +1,18 @@
+# Looma local store - NEVER commit (contains derived data from your transcripts)
+*.db
+*.db-wal
+*.db-shm
+.looma/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+.venv/
+venv/
+
+# OS
+.DS_Store
