@@ -1,10 +1,37 @@
 """Shared lexical matching helpers over FTS5 + a lexical fallback."""
 
+import json
 import re
 
 from ..util import tokens
 
 _FTS_SAFE = re.compile(r"[^a-z0-9]+")
+_PATH_SPLIT = re.compile(r"[/_\-.]+")
+_FTS_FLOOR = 0.16  # an FTS-only (stemmed) match clears COLD but ranks below real coverage
+
+
+def _file_tokens(files_field) -> str:
+    """Path components as searchable words: 'a/sync-results/route.ts' -> 'a sync results route ts'."""
+    try:
+        files = json.loads(files_field or "[]")
+    except (json.JSONDecodeError, TypeError):
+        return ""
+    return " ".join(_PATH_SPLIT.sub(" ", f) for f in files)
+
+
+def _memory_text_by_workitem(store, project_id: int) -> dict:
+    """One pass: join each WorkItem's linked memory titles into one searchable blob."""
+    out: dict[int, list[str]] = {}
+    try:
+        rows = store.conn.execute(
+            "SELECT work_item_id, title FROM entities WHERE project_id=? AND work_item_id IS NOT NULL",
+            (project_id,),
+        ).fetchall()
+    except Exception:
+        return {}
+    for r in rows:
+        out.setdefault(r["work_item_id"], []).append(r["title"] or "")
+    return {k: " ".join(v) for k, v in out.items()}
 
 
 def soft_sim(goal: str, text: str) -> float:
@@ -44,27 +71,37 @@ def match_work_items(store, project_id: int, goal: str, vstore=None) -> list[dic
         for ref_id, vscore in vstore.search("workitem", goal, limit=10):
             if ref_id in wis:
                 scores[ref_id] = max(scores.get(ref_id, 0.0), vscore)
+
+    # FTS contributes RECALL, not score: it ensures stemmed/tokenized matches are
+    # considered (a small floor), but the relevance number is coverage-based (see
+    # below) so it is honest 0-1 and the resume thresholds mean something. Scoring
+    # by bm25 position gave every top hit relevance 1.0 regardless of overlap.
     q = fts_query(goal)
     if q:
         try:
             rows = store.conn.execute(
-                """SELECT rowid, bm25(fts_workitems) AS rank FROM fts_workitems
-                   WHERE fts_workitems MATCH ? ORDER BY rank""",
-                (q,),
+                "SELECT rowid FROM fts_workitems WHERE fts_workitems MATCH ?", (q,),
             ).fetchall()
-            for i, r in enumerate(rows):
+            for r in rows:
                 if r["rowid"] in wis:
-                    # higher for better bm25 (lower rank); normalize by position
-                    scores[r["rowid"]] = max(scores.get(r["rowid"], 0.0), 1.0 / (1 + i))
+                    scores[r["rowid"]] = max(scores.get(r["rowid"], 0.0), _FTS_FLOOR)
         except Exception:
             pass
 
-    # lexical fallback / booster over title + aliases (substring-aware)
+    # Coverage-based lexical score over title + aliases + summary + file-path
+    # tokens + linked-memory text, so relevance survives a generic title
+    # ("Work in src/"): a goal like "sync results cron" still matches an item that
+    # touches sync-results/route.ts or has a "sync" todo. Without this, 48%
+    # generic titles cap relevance ~0.28 and resume goes COLD (Phase 1).
+    mem_text = _memory_text_by_workitem(store, project_id)
     for wid, w in wis.items():
+        files_txt = _file_tokens(w.get("files"))
         lex = max(
             soft_sim(goal, w.get("title") or ""),
             soft_sim(goal, w.get("aliases") or ""),
             soft_sim(goal, w.get("summary") or ""),
+            0.9 * soft_sim(goal, files_txt),          # files are strong but indirect
+            0.8 * soft_sim(goal, mem_text.get(wid, "")),  # linked decisions/todos/bugs
         )
         if lex > 0:
             scores[wid] = max(scores.get(wid, 0.0), lex)

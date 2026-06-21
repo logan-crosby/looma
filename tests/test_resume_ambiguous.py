@@ -45,12 +45,23 @@ class ResumeAmbiguityTest(unittest.TestCase):
         self.assertEqual(res["mode"], resume_mod.COLD)
         self.assertEqual(res.get("reason"), "no_match")
 
-    def test_cold_when_match_low_confidence(self):
+    def test_low_confidence_high_relevance_surfaces(self):
+        # Phase 1 fix: resume gates on match RELEVANCE, not the item's intrinsic
+        # confidence. A clearly-relevant item must surface even when its
+        # confidence is low (the common solo-dev case), not collapse to COLD.
         _add_wi(self.store, self.pid, "Authentication Login", ["build authentication login"], 0.20)
         self.store.commit()
         res = resume_mod.resume(self.store, self.project, "authentication")
-        self.assertEqual(res["mode"], resume_mod.COLD)
-        self.assertEqual(res.get("reason"), "low_confidence")
+        self.assertEqual(res["mode"], resume_mod.CONFIDENT)
+        self.assertEqual(res["bundle"]["work_item"]["title"], "Authentication Login")
+
+    def test_weak_only_match_is_not_confident(self):
+        # An item that matches the goal only weakly (one stemmed/partial token)
+        # must not be asserted as the answer; it surfaces as AMBIGUOUS at most.
+        _add_wi(self.store, self.pid, "Authentication Login", ["authentication login"], 0.90)
+        self.store.commit()
+        res = resume_mod.resume(self.store, self.project, "authn review notes draft pass two")
+        self.assertNotEqual(res["mode"], resume_mod.CONFIDENT)
 
     def test_no_goal_picks_most_recent(self):
         _add_wi(self.store, self.pid, "Authentication Login", ["build authentication login"], 0.60)

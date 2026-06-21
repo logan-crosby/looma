@@ -6,7 +6,19 @@ for the slice - every result still carries provenance + confidence + band.
 """
 
 from .. import config
+from ..sanitize import looks_like_code
 from .match import fts_query
+
+# Relevance dominates ranking; confidence is a light tie-breaker. Ranking purely
+# by confidence (the old behaviour) let an unrelated conf-0.25 bug outrank a
+# precise conf-0.0 decision (Phase 1 evaluation).
+_W_REL = 0.75
+_W_CONF = 0.25
+
+
+def _rel_from_rank(i: int) -> float:
+    """Map a 0-based bm25 position to a 0-1 relevance (1.0, 0.5, 0.33, ...)."""
+    return 1.0 / (1 + i)
 
 
 def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list[dict]:
@@ -21,12 +33,12 @@ def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list
                 """SELECT e.kind, e.title, e.confidence, w.title AS wi_title
                    FROM entities e LEFT JOIN work_items w ON w.id=e.work_item_id
                    WHERE e.id=? AND e.project_id=?""", (ref_id, project_id)).fetchone()
-            if r:
+            if r and not looks_like_code(r["title"]):
                 seen_ent.add(ref_id)
                 conf = r["confidence"] or 0.0
                 results.append({"type": "memory", "kind": r["kind"], "title": r["title"],
                                 "confidence": conf, "band": config.band(conf),
-                                "work_item": r["wi_title"], "_v": round(vscore, 3)})
+                                "work_item": r["wi_title"], "_rel": float(vscore)})
     if not q:
         return results[:limit]
 
@@ -42,14 +54,14 @@ def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list
                ORDER BY bm25(fts_entities) LIMIT ?""",
             (q, project_id, limit),
         ).fetchall()
-        for r in rows:
-            if r["id"] in seen_ent:
+        for i, r in enumerate(rows):
+            if r["id"] in seen_ent or looks_like_code(r["title"]):
                 continue
             conf = r["confidence"] or 0.0
             results.append({
                 "type": "memory", "kind": r["kind"], "title": r["title"],
                 "confidence": conf, "band": config.band(conf),
-                "work_item": r["wi_title"],
+                "work_item": r["wi_title"], "_rel": _rel_from_rank(i),
             })
     except Exception:
         pass
@@ -63,14 +75,15 @@ def ask(store, project_id: int, query: str, limit: int = 8, vstore=None) -> list
                ORDER BY bm25(fts_workitems) LIMIT ?""",
             (q, project_id, limit),
         ).fetchall()
-        for r in rows:
+        for i, r in enumerate(rows):
             conf = r["confidence"] or 0.0
             results.append({
                 "type": "workitem", "kind": r["kind"], "title": r["title"],
                 "confidence": conf, "band": config.band(conf), "work_item": r["title"],
+                "_rel": _rel_from_rank(i),
             })
     except Exception:
         pass
 
-    results.sort(key=lambda x: x["confidence"], reverse=True)
+    results.sort(key=lambda x: _W_REL * x.get("_rel", 0.0) + _W_CONF * x["confidence"], reverse=True)
     return results[:limit]

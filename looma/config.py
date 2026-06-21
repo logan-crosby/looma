@@ -8,9 +8,15 @@ BAND_HIGH = 0.75
 BAND_LOW = 0.40
 
 # Resume ambiguity thresholds (ARCHITECTURE.md section 10.1).
+# These gate on MATCH RELEVANCE (how well a WorkItem answers the goal), not the
+# item's intrinsic confidence. Gating on intrinsic confidence made resume return
+# COLD even when the correct item ranked #1 with relevance 1.0, because solo-dev
+# work is structurally capped below the confidence band (Phase 1 evaluation).
 RESUME_HIGH = BAND_HIGH
 RESUME_LOW = BAND_LOW
 RESUME_MARGIN = 0.15
+MATCH_STRONG = 0.45   # relevance at/above this with a clear margin -> CONFIDENT
+MATCH_WEAK = 0.15     # relevance below this -> COLD (no real match)
 
 # WorkItem resolution thresholds (ARCHITECTURE.md section 4.4).
 RESOLVE_HIGH = 0.62  # assign to existing WorkItem at/above this score
