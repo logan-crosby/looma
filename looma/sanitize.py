@@ -57,7 +57,7 @@ def is_noise(text: str) -> bool:
 # code / diff / log fragments that must never surface as a title, memory, or
 # next step. Shared by retrieval (display-time filtering) and extraction.
 _CODE_FRAGMENT = re.compile(
-    r"(^\s*[+\-]\s)|(^\s*\+)|//|[{}]|=>|;\s*$|`|</|/>|::|==|!=|\)\s*\{|<[A-Za-z][\w-]*[\s/>]|className=|"
+    r"(^\s*[+\-]\s)|(^\s*\+)|(^\s*#)|@@|//|[{}]|=>|;\s*$|`|</|/>|::|==|!=|\)\s*\{|<[A-Za-z][\w-]*[\s/>]|className=|"
     r"\b(?:const|let|await|function|return|def|import|class|console|throw new)\b|"
     r"Date\.now|\b\w+\([^)]*\)\s*[:{]|\b\w+\.\w+\s*\("  # dotted method call, e.g. store.set_defaults(
 )

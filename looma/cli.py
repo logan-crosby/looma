@@ -282,6 +282,15 @@ def cmd_brief(args) -> int:
     return 0
 
 
+def cmd_weekly(args) -> int:
+    from . import weekly as weekly_mod
+    store = _open_store(args)
+    days = getattr(args, "days", None) or 7
+    print(weekly_mod.format_weekly(weekly_mod.build(store, days=days, vstore=_vstore(args))))
+    store.close()
+    return 0
+
+
 def cmd_today(args) -> int:
     from . import today as today_mod
     store = _open_store(args)
@@ -594,6 +603,10 @@ def build_parser() -> argparse.ArgumentParser:
     pty.add_argument("--all", action="store_true", help="cross-project view of recently touched repos")
     pty.add_argument("--days", type=int, default=7, help="recency window in days (default 7)")
     pty.set_defaults(func=cmd_today)
+
+    pwk = sub.add_parser("weekly", parents=[common], help="the week in 2 minutes: worked on / shipped / decisions / blockers")
+    pwk.add_argument("--days", type=int, default=7, help="window in days (default 7)")
+    pwk.set_defaults(func=cmd_weekly)
 
     pbr = sub.add_parser("brief", parents=[common], help="60-second project orientation")
     pbr.add_argument("--project", help="project canonical key (default: current dir)")

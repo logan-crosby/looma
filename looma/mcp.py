@@ -1,7 +1,7 @@
 """Minimal MCP server (goal Phase 4) - lets any MCP agent consume Looma context.
 
 Pure stdlib: JSON-RPC 2.0 over newline-delimited stdio. No dependency, no network,
-no hosted service - fully local. Tools: today, resume_work, brief, ask, timeline, explain, list_work, recall.
+no hosted service - fully local. Tools: today, weekly, resume_work, brief, ask, timeline, explain, list_work, recall.
 Run via `looma mcp` (typically launched by the agent inside the project directory).
 """
 
@@ -30,6 +30,10 @@ TOOLS = [
      "description": "Daily driver: what you're working on, what changed recently, what's blocked, what to do next - plus other repos touched recently.",
      "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT,
                      "days": {"type": "integer", "description": "recency window (default 7)"}}}},
+    {"name": "weekly",
+     "description": "The week across all repos: worked on, shipped (commits), decisions, unresolved blockers.",
+     "inputSchema": {"type": "object", "properties": {
+                     "days": {"type": "integer", "description": "window in days (default 7)"}}}},
     {"name": "brief",
      "description": "60-second project orientation: summary, active work, recent decisions, risks, blockers, recent commits, suggested next work.",
      "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT}}},
@@ -85,6 +89,11 @@ class _Server:
         if not proj:
             return today_mod.format_today(today_mod.build_cross_project(self.store, days=days, vstore=self.vstore))
         return today_mod.format_today(today_mod.build(self.store, proj, days=days, vstore=self.vstore))
+
+    def weekly(self, a):
+        from . import weekly as weekly_mod
+        return weekly_mod.format_weekly(weekly_mod.build(self.store, days=a.get("days") or 7,
+                                                         vstore=self.vstore))
 
     def brief(self, a):
         from . import brief as brief_mod
