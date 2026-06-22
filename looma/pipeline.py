@@ -68,12 +68,18 @@ def ingest_messages(store: Store, projects_dir=None, limit=None, project_filter=
             continue
         # project identity from the session's first event that carries a cwd
         root = next((e.project_root for e in events if e.project_root), None)
-        ident = identity.resolve(root) or {
-            "canonical_key": f"unknown:{handle.native_id}",
-            "display_name": "unknown",
-            "root_path": None,
-            "git_remote": None,
-        }
+        ident = identity.resolve(root)
+        if not ident:
+            # Unresolvable session: one shared per-source bucket, NOT one project
+            # per session. Minting unknown:<session-id> created 46 singleton
+            # "projects" (64% of the corpus); a single labeled bucket is honest
+            # and keeps `looma status` meaningful. (V2 Phase 2.)
+            ident = {
+                "canonical_key": f"unsorted:{handle.source}",
+                "display_name": f"Unsorted ({handle.source})",
+                "root_path": None,
+                "git_remote": None,
+            }
         if project_filter and ident["canonical_key"] != project_filter:
             skipped += 1
             continue

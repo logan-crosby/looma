@@ -48,3 +48,16 @@ class CrossAgentTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CursorWorkspaceRecoveryTest(unittest.TestCase):
+    def test_common_root_recovers_workspace(self):
+        from looma.adapters.cursor import _common_root, _uri_to_path
+        self.assertEqual(_uri_to_path("file:///Users/x/proj/a.js"), "/Users/x/proj/a.js")
+        self.assertEqual(
+            _common_root(["/Users/x/proj/src/a.js", "/Users/x/proj/src/b.js",
+                          "/Users/x/proj/c.js"]),
+            "/Users/x/proj")
+        # too-shallow common ancestor is not a project
+        self.assertIsNone(_common_root(["/Users/a.js", "/tmp/b.js"]))
+        self.assertIsNone(_common_root([]))

@@ -32,6 +32,22 @@ class ProjectIdentityTest(unittest.TestCase):
     def test_resolve_none_for_missing_root(self):
         self.assertIsNone(identity.resolve(None))
 
+    def test_ephemeral_and_degenerate_roots_rejected(self):
+        # V2 Phase 2: temp/scratch/config/degenerate roots are not projects
+        for junk in ["/", "/tmp", "/private/tmp", "/var/tmp",
+                     "/private/var/folders/sm/abcd1234567890/T",
+                     os.path.expanduser("~/.claude/projects"),
+                     os.path.expanduser("~")]:
+            self.assertIsNone(identity.resolve(junk), junk)
+
+    def test_deep_temp_subdir_still_resolves(self):
+        # a real project that happens to live under a temp dir (pytest fixtures)
+        # must still resolve - only the scratch ROOT itself is ephemeral
+        with tempfile.TemporaryDirectory() as tmp:
+            sub = os.path.join(tmp, "myproject")
+            os.makedirs(sub)
+            self.assertIsNotNone(identity.resolve(sub))
+
 
 if __name__ == "__main__":
     unittest.main()

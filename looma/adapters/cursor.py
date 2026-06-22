@@ -31,6 +31,28 @@ def _hash(cid, bid):
     return hashlib.sha1(f"{SOURCE}:{cid}:{bid}".encode()).hexdigest()
 
 
+def _uri_to_path(u: str):
+    if isinstance(u, str) and u.startswith("file://"):
+        p = unquote(urlparse(u).path)
+        return p or None
+    return None
+
+
+def _common_root(paths: list[str]):
+    """Deepest directory containing all given file paths (the workspace root).
+
+    Cursor often omits a session's workspace but lists the files it touched in
+    `allAttachedFileCodeChunksUris`. Their common parent recovers the project so
+    the session clusters with the rest of that repo instead of going unsorted.
+    """
+    dirs = [os.path.dirname(p) for p in paths if p and p.startswith("/")]
+    if not dirs:
+        return None
+    common = os.path.commonpath(dirs) if len(dirs) > 1 else dirs[0]
+    # guard against a too-shallow common ancestor (e.g. /Users) that is not a project
+    return common if common.count("/") >= 3 else None
+
+
 class CursorAdapter:
     id = SOURCE
 
@@ -75,6 +97,10 @@ class CursorAdapter:
         except (json.JSONDecodeError, ValueError, TypeError):
             return
         headers = cd.get("fullConversationHeadersOnly") or []
+        # composer-level workspace fallback: the common parent of attached files,
+        # used when no bubble carries a workspaceUris (V2 Phase 2 identity hygiene)
+        attached = [p for p in (_uri_to_path(u) for u in (cd.get("allAttachedFileCodeChunksUris") or [])) if p]
+        composer_root = _common_root(attached)
         project_root = None
         seq = 0
         events: list[NormalizedEvent] = []
@@ -105,7 +131,8 @@ class CursorAdapter:
                 ts=b.get("createdAt"), role=role,
                 agent_model=(b.get("modelInfo") or {}).get("modelName"),
                 text=text, tool_calls=[], raw_json=""))
+        resolved_root = project_root or composer_root
         for e in events:
             if not e.project_root:
-                e.project_root = project_root
+                e.project_root = resolved_root
         yield from events
