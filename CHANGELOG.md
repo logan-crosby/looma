@@ -4,6 +4,44 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
+## [2.0.0] - 2026-06-22
+
+The agent context layer. Make Looma the default, grounded context source for
+coding agents. Driven by a seven-phase evaluation on a 615-session, three-agent
+real corpus (LOOMA_V2_REPORT.md, LOOMA_V2_READINESS.md).
+
+### Added
+- `looma pack` (CLI + MCP): the minimal, token-budgeted, confidence-aware context
+  package for another agent - active work, decisions, blockers, relevant files,
+  recent changes. 2985x lighter than the raw transcript; bounded under ~900
+  tokens for any repo.
+- `looma inspect` (CLI + MCP): understand a repository without reading its
+  transcripts - architecture summary, active systems, ownership clusters, risks,
+  change hotspots.
+
+### Changed
+- Extraction quality: filter synthetic/programmatic sessions (48% of the corpus)
+  from WorkItem/memory generation; tighten bug classification to require an
+  explicit problem assertion; broaden decision/architecture recall; normalize
+  WorkItem-naming verb stems and clause trimming; calibrate memory confidence to
+  inherit WorkItem grounding. Real corpus: Untitled work 45%->13%, bug share of
+  memories 79%->38%, named work items 34%->56%. Benchmark memory F1 0.69->0.90,
+  architecture 0.00->1.00, work label-hit 0.60->1.00.
+- Identity hygiene: reject ephemeral/degenerate roots (temp dirs, fs root, config
+  homes, home dir); collapse unresolvable sessions into one per-agent unsorted
+  bucket instead of one project per session; recover Cursor workspaces from
+  attached-file URIs. Projects 72->24; unknown:<uuid> singletons 46->0; junk
+  projects 5->0.
+- MCP efficiency: `ask` retrieval fixed - stemmed/prefix FTS so inflected queries
+  match (was returning 0 hits); `explain`/`timeline` output bounded; JSON/
+  tool-schema fragments dropped from answers. Every MCP tool under ~900 tokens;
+  per-turn tools average 40-350.
+
+### Validated
+- Cross-agent: the one cross-agent work item scores 4.6x the single-agent
+  confidence average (0.44 vs 0.095) - merge mechanism confirmed; extraction
+  robust across Claude/Codex/Cursor; 0 manual corrections needed.
+
 ## [1.6.0] - 2026-06-21
 
 The daily loop. Driven by a usage analysis (DAILY_USAGE_REPORT.md); product-fit

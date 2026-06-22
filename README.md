@@ -39,6 +39,8 @@ looma doctor              # check Python, FTS5, Claude history, git, data dir
 looma ingest              # index your coding-agent history (auto-creates the DB)
 looma                     # the daily driver: working on / changed / blocked / next
 looma weekly              # the week across all repos: worked on / shipped / decisions
+looma pack                # minimal token-budgeted context pack for another agent
+looma inspect             # understand a repo: architecture / systems / ownership / risks
 looma resume "auth"       # reconstruct context for a goal
 looma explain "auth"      # why a WorkItem exists, how it evolved, what shaped it
 looma ask "why postgres"  # search validated memory + work items
@@ -106,10 +108,18 @@ Control it explicitly with `LOOMA_EXTRACTOR=auto|heuristic|llm` (default `auto`)
 
 ## Current Status
 
-**v1.6.0** - the daily loop: `looma today` (bare `looma`) and `looma weekly`,
-driven by a usage analysis ([DAILY_USAGE_REPORT.md](DAILY_USAGE_REPORT.md);
-product-fit summary in [LOOMA_PRODUCT_FIT_REPORT.md](LOOMA_PRODUCT_FIT_REPORT.md)).
-Built on the v1.5 refinement ([LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
+**v2.0.0** - the agent context layer: `looma pack` (the smallest grounded preamble
+for another agent, 2985x lighter than the raw transcript) and `looma inspect`
+(understand a repo - architecture, systems, ownership, risks - without reading the
+transcripts), on top of a sharper extractor (Untitled work 45%->13%, bug
+overclassification 79%->38%, benchmark F1 0.69->0.90) and clean identities
+(72->24 projects). See [LOOMA_V2_REPORT.md](LOOMA_V2_REPORT.md) and
+[LOOMA_V2_READINESS.md](LOOMA_V2_READINESS.md).
+
+Built on **v1.6.0** - the daily loop: `looma today` (bare `looma`) and
+`looma weekly` ([DAILY_USAGE_REPORT.md](DAILY_USAGE_REPORT.md);
+[LOOMA_PRODUCT_FIT_REPORT.md](LOOMA_PRODUCT_FIT_REPORT.md)) - and the v1.5
+refinement ([LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
 
 ### Works today
 
@@ -134,15 +144,21 @@ Built on the v1.5 refinement ([LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
 - **Timeline**: `looma timeline` (feature evolution over time)
 - **Explain**: `looma explain <work>` (why a WorkItem exists, how it evolved, which
   decisions shaped it, what changed)
+- **Context pack**: `looma pack` (the minimal, token-budgeted, confidence-aware
+  context package to prepend to a fresh agent session; 2985x lighter than the raw
+  transcript and bounded under ~900 tokens for any repo)
+- **Repository intelligence**: `looma inspect` (architecture, active systems,
+  ownership clusters, risks, change hotspots - understand a repo without reading
+  its transcripts)
 - **MCP server**: `looma mcp` (any agent can consume Looma context, local stdio;
-  tools: today, weekly, resume_work, brief, ask, timeline, explain, list_work,
-  recall). Hands an agent a grounded orientation in 1-3% of the raw-transcript
-  tokens (32x-101x compression).
+  tools: today, weekly, resume_work, brief, pack, inspect, ask, timeline, explain,
+  list_work, recall). Hands an agent a grounded orientation in a rounding-error
+  fraction of the raw-transcript tokens.
 - **Watcher daemon**: `looma daemon` (stays current automatically)
 - Graph health with degradation warnings: `looma status --health`
-- CLI: `today` (bare `looma`), `weekly`, `ingest`, `brief`, `resume`, `ask`,
-  `explain`, `timeline`, `work`, `status`, `doctor`, `reset`, `benchmark`,
-  `correct`, `reprocess`, `mcp`, `daemon`, `init`
+- CLI: `today` (bare `looma`), `weekly`, `ingest`, `brief`, `pack`, `inspect`,
+  `resume`, `ask`, `explain`, `timeline`, `work`, `status`, `doctor`, `reset`,
+  `benchmark`, `correct`, `reprocess`, `mcp`, `daemon`, `init`
 
 ### Planned (not yet built)
 
