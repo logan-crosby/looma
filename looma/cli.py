@@ -293,6 +293,24 @@ def cmd_brief(args) -> int:
     return 0
 
 
+def cmd_pack(args) -> int:
+    from . import pack as pack_mod
+    store = _open_store(args)
+    proj = _pick_project(store, args)
+    if not proj:
+        store.close()
+        return 1
+    p = pack_mod.build(store, proj, min_conf=getattr(args, "min_confidence", 0.0) or 0.0,
+                       vstore=_vstore(args))
+    if getattr(args, "json", False):
+        import json as _json
+        print(_json.dumps(p, default=str, indent=2))
+    else:
+        print(pack_mod.format_pack(p, budget=getattr(args, "budget", None) or 900))
+    store.close()
+    return 0
+
+
 def cmd_weekly(args) -> int:
     from . import weekly as weekly_mod
     store = _open_store(args)
@@ -631,6 +649,15 @@ def build_parser() -> argparse.ArgumentParser:
     pbr = sub.add_parser("brief", parents=[common], help="60-second project orientation")
     pbr.add_argument("--project", help="project canonical key (default: current dir)")
     pbr.set_defaults(func=cmd_brief)
+
+    ppk = sub.add_parser("pack", parents=[common],
+                         help="minimal, token-budgeted context pack for another agent")
+    ppk.add_argument("--project", help="project canonical key (default: current dir)")
+    ppk.add_argument("--budget", type=int, default=900, help="token budget (default 900)")
+    ppk.add_argument("--min-confidence", type=float, default=0.0,
+                     dest="min_confidence", help="drop memories below this confidence")
+    ppk.add_argument("--json", action="store_true", help="emit structured JSON")
+    ppk.set_defaults(func=cmd_pack)
 
     ptl = sub.add_parser("timeline", parents=[common], help="show a work item's evolution over time")
     ptl.add_argument("work", nargs="*", help="work item id (#5) or goal text")

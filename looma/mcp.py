@@ -1,7 +1,7 @@
 """Minimal MCP server (goal Phase 4) - lets any MCP agent consume Looma context.
 
 Pure stdlib: JSON-RPC 2.0 over newline-delimited stdio. No dependency, no network,
-no hosted service - fully local. Tools: today, weekly, resume_work, brief, ask, timeline, explain, list_work, recall.
+no hosted service - fully local. Tools: today, weekly, resume_work, brief, pack, ask, timeline, explain, list_work, recall.
 Run via `looma mcp` (typically launched by the agent inside the project directory).
 """
 
@@ -38,6 +38,11 @@ TOOLS = [
     {"name": "brief",
      "description": "60-second project orientation: summary, active work, recent decisions, risks, blockers, recent commits, suggested next work.",
      "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT}}},
+    {"name": "pack",
+     "description": "Minimal, token-budgeted context pack to prepend to a fresh session: active work, decisions, blockers, relevant files, recent changes. The cheapest grounded preamble - use this first.",
+     "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT,
+                     "budget": {"type": "integer", "description": "token budget (default 900)"},
+                     "min_confidence": {"type": "number", "description": "drop memories below this confidence"}}}},
     {"name": "ask",
      "description": "Search validated project memory and work items.",
      "inputSchema": {"type": "object", "properties": {**_OPT_PROJECT,
@@ -95,6 +100,15 @@ class _Server:
         from . import weekly as weekly_mod
         return weekly_mod.format_weekly(weekly_mod.build(self.store, days=a.get("days") or 7,
                                                          vstore=self.vstore))
+
+    def pack(self, a):
+        from . import pack as pack_mod
+        proj = self._project(a)
+        if not proj:
+            return self._no_project(a)
+        p = pack_mod.build(self.store, proj, min_conf=float(a.get("min_confidence") or 0.0),
+                           vstore=self.vstore)
+        return pack_mod.format_pack(p, budget=int(a.get("budget") or 900))
 
     def brief(self, a):
         from . import brief as brief_mod
