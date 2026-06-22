@@ -52,8 +52,7 @@ looma/confidence.py  the v3 confidence formula
 ```
 
 The full design and the rationale behind every layer is in
-[ARCHITECTURE.md](ARCHITECTURE.md). What is real vs heuristic vs stubbed is in
-[IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md). Read those before a non-trivial PR.
+[ARCHITECTURE.md](ARCHITECTURE.md). Read it before a non-trivial PR.
 
 ## Pull requests
 

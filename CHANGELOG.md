@@ -8,7 +8,7 @@ versions.
 
 The agent context layer. Make Looma the default, grounded context source for
 coding agents. Driven by a seven-phase evaluation on a 615-session, three-agent
-real corpus (LOOMA_V2_REPORT.md, LOOMA_V2_READINESS.md).
+real corpus.
 
 ### Added
 - `looma pack` (CLI + MCP): the minimal, token-budgeted, confidence-aware context
@@ -44,8 +44,7 @@ real corpus (LOOMA_V2_REPORT.md, LOOMA_V2_READINESS.md).
 
 ## [1.6.0] - 2026-06-21
 
-The daily loop. Driven by a usage analysis (DAILY_USAGE_REPORT.md); product-fit
-summary in LOOMA_PRODUCT_FIT_REPORT.md.
+The daily loop. Driven by a usage analysis of the real corpus.
 
 ### Added
 - **`looma today`** (and bare `looma`) - the daily driver: what you're working on,
@@ -75,7 +74,7 @@ summary in LOOMA_PRODUCT_FIT_REPORT.md.
 ## [1.5.0] - 2026-06-21
 
 Refinement cycle: make Looma feel indispensable. Driven by a real-corpus
-evaluation (REAL_WORLD_EVALUATION.md). See LOOMA_V1_5_REPORT.md.
+evaluation.
 
 ### Added
 - **`looma brief`** - 60-second project orientation (summary, active work, recent
@@ -105,7 +104,7 @@ evaluation (REAL_WORLD_EVALUATION.md). See LOOMA_V1_5_REPORT.md.
 
 ## [1.0.0] - 2026-06-21
 
-First "complete v1" milestone for solo developers. See LOOMA_V1_REPORT.md.
+First "complete v1" milestone for solo developers.
 
 ### Added (v1 milestone)
 - **Multi-agent ingestion**: Codex + Cursor adapters alongside Claude Code; sessions

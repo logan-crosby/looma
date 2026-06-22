@@ -13,9 +13,9 @@ Instead of searching transcripts, Looma reconstructs:
 
 Local-first. No cloud. No API keys.
 
-> Status: **v1.0.0** (solo-dev milestone). Works today on Claude Code history. Honest about
-> what is real vs heuristic - see [Current Status](#current-status) and
-> [RELEASE_ALPHA.md](RELEASE_ALPHA.md).
+> Status: **v2.0.0** - the agent context layer. Works today on Claude Code, Codex,
+> and Cursor history. Honest about what is real vs heuristic - see
+> [Current Status](#current-status).
 
 ---
 
@@ -55,8 +55,7 @@ unfinished todos, affecting bugs, recent sessions, the linked commits and files,
 and a next likely step - each with a confidence score. If Looma is not sure, it
 says so and shows alternatives instead of guessing.
 
-See [SAMPLE_OUTPUT.md](SAMPLE_OUTPUT.md) for representative output (Looma has been
-exercised on hundreds of sessions across a dozen projects), and
+Looma has been exercised on hundreds of sessions across a dozen projects; see
 [docs/demo/](docs/demo/) for the recorded demo.
 
 ## How it works
@@ -113,13 +112,10 @@ for another agent, 2985x lighter than the raw transcript) and `looma inspect`
 (understand a repo - architecture, systems, ownership, risks - without reading the
 transcripts), on top of a sharper extractor (Untitled work 45%->13%, bug
 overclassification 79%->38%, benchmark F1 0.69->0.90) and clean identities
-(72->24 projects). See [LOOMA_V2_REPORT.md](LOOMA_V2_REPORT.md) and
-[LOOMA_V2_READINESS.md](LOOMA_V2_READINESS.md).
+(72->24 projects). See the [CHANGELOG](CHANGELOG.md) for the full history.
 
 Built on **v1.6.0** - the daily loop: `looma today` (bare `looma`) and
-`looma weekly` ([DAILY_USAGE_REPORT.md](DAILY_USAGE_REPORT.md);
-[LOOMA_PRODUCT_FIT_REPORT.md](LOOMA_PRODUCT_FIT_REPORT.md)) - and the v1.5
-refinement ([LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
+`looma weekly` - and the v1.5 refinement.
 
 ### Works today
 
@@ -168,8 +164,7 @@ refinement ([LOOMA_V1_5_REPORT.md](LOOMA_V1_5_REPORT.md)).
 
 Extraction is heuristic by default and will let the occasional noisy item through;
 confidence + promotion down-rank it, and the auto-detected local LLM extractor is the
-precision upgrade. Details in [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) and
-[V1_READINESS.md](V1_READINESS.md).
+precision upgrade. The full design is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Why not just search transcripts
 
