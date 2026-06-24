@@ -31,6 +31,78 @@ def _is_ephemeral(path: str) -> bool:
     return os.path.abspath(path) == os.path.abspath(os.path.expanduser("~"))
 
 
+# A session run from a bare temp root often still does real work in a subdir - an
+# OSS repo cloned into /tmp/hunt-foo, a fixture under /var/folders. We recover the
+# project from the files it touched. The harness scratchpad (claude-<uid>/...) and
+# dotfiles are noise, not projects.
+_TEMP_ROOT = re.compile(
+    r"^(/(?:private/)?tmp"
+    r"|/(?:private/)?var/folders/[^/]+/[^/]+/[A-Z])(?=/)"
+)
+_SCRATCH_SUBDIR = re.compile(r"^claude-\d+$|^\.")
+
+
+def _touched_paths(events) -> list:
+    """Absolute file paths the session read or edited, from its tool calls."""
+    paths = []
+    for ev in events:
+        for call in getattr(ev, "tool_calls", None) or []:
+            inp = call.get("input")
+            if not isinstance(inp, dict):
+                continue
+            for key in ("file_path", "path", "notebook_path"):
+                v = inp.get(key)
+                if isinstance(v, str) and v.startswith("/"):
+                    paths.append(v)
+    return paths
+
+
+def _candidate_project_dir(path: str) -> Optional[str]:
+    """The project directory a touched file implies, or None if it is scratch.
+
+    Under a temp root: temp-root + first subdir (the cloned repo / fixture);
+    the harness scratchpad is skipped. Elsewhere: the enclosing git repo root if
+    one exists on disk, so the session merges with that project's identity.
+    """
+    real = os.path.realpath(path)
+    m = _TEMP_ROOT.match(real)
+    if m:
+        rest = real[m.end():].lstrip("/")
+        first = rest.split("/", 1)[0] if rest else ""
+        if not first or _SCRATCH_SUBDIR.match(first):
+            return None
+        return m.group(1) + "/" + first
+    repo = gitutil.repo_root(os.path.dirname(real))
+    return repo or None
+
+
+def resolve_from_events(events) -> Optional[dict]:
+    """Fallback identity for an ephemeral-cwd session: recover the project from
+    the files it actually touched. Used only when resolve(cwd) gives nothing.
+
+    Returns the identity of the dominant touched directory, or None when the
+    session left no recoverable project footprint (pure scratch work).
+    """
+    counts: dict[str, int] = {}
+    for p in _touched_paths(events):
+        d = _candidate_project_dir(p)
+        if d:
+            counts[d] = counts.get(d, 0) + 1
+    if not counts:
+        return None
+    # dominant directory wins; deepest path breaks ties (more specific project)
+    best = max(counts, key=lambda d: (counts[d], len(d)))
+    ident = resolve(best)
+    if ident:
+        return ident
+    return {
+        "canonical_key": f"path:{best}",
+        "display_name": os.path.basename(best) or best,
+        "root_path": None,
+        "git_remote": None,
+    }
+
+
 def resolve(root: Optional[str]) -> Optional[dict]:
     """Resolve a directory to a project identity dict, or None if no root.
 

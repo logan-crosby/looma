@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 from . import confidence, correction, gitutil, identity
+from .sanitize import is_automated_session
 from .adapters.claude import ClaudeAdapter
 from .config import claude_projects_dir
 from .extraction import candidates as cand_mod
@@ -70,13 +71,25 @@ def ingest_messages(store: Store, projects_dir=None, limit=None, project_filter=
         root = next((e.project_root for e in events if e.project_root), None)
         ident = identity.resolve(root)
         if not ident:
+            # cwd was an ephemeral root (e.g. /tmp): recover the project from the
+            # files the session actually touched before giving up. (V2.1.)
+            ident = identity.resolve_from_events(events)
+        if not ident:
             # Unresolvable session: one shared per-source bucket, NOT one project
             # per session. Minting unknown:<session-id> created 46 singleton
             # "projects" (64% of the corpus); a single labeled bucket is honest
             # and keeps `looma status` meaningful. (V2 Phase 2.)
+            #
+            # Automated sessions (memory summarizers / extraction API calls run
+            # from /tmp) are projectless noise - on this corpus they were ~all of
+            # the "unsorted" claude sessions. Bucket them separately so "Unsorted"
+            # reflects genuinely-unresolved *real* work, not tooling. (V2.1.)
+            msgs = [{"role": e.role, "text": e.text} for e in events]
+            kind = "automated" if is_automated_session(msgs) else "unsorted"
+            label = "Automated" if kind == "automated" else "Unsorted"
             ident = {
-                "canonical_key": f"unsorted:{handle.source}",
-                "display_name": f"Unsorted ({handle.source})",
+                "canonical_key": f"{kind}:{handle.source}",
+                "display_name": f"{label} ({handle.source})",
                 "root_path": None,
                 "git_remote": None,
             }
@@ -107,6 +120,45 @@ def ingest_messages(store: Store, projects_dir=None, limit=None, project_filter=
     store.commit()
     return {"sessions": sessions_seen, "new_messages": new_msgs, "skipped": skipped,
             "per_source": per_source, "changed_projects": sorted(changed_projects)}
+
+
+def _repo_basename(s: str) -> str:
+    return s.rstrip("/").rsplit("/", 1)[-1].lower() if s else ""
+
+
+def reconcile_projects(store: Store) -> int:
+    """Fold an orphan path-keyed project into the canonical remote-keyed project of
+    the same repo. Handles the same repo cloned in two locations where one checkout
+    had no readable git remote at ingest, so its sessions split off under a path:
+    key. (V2.1)
+
+    Conservative: only a remote-less `path:` project is ever absorbed, and only
+    when exactly one remote project shares its repo basename - so genuinely distinct
+    repos that happen to share a name are left alone. Returns the number merged.
+    Run after ingest_messages and before rebuild (operates on sessions, not the
+    derived graph).
+    """
+    projects = store.list_projects()
+    remote_by_name: dict[str, list[dict]] = {}
+    for p in projects:
+        if p.get("git_remote"):
+            remote_by_name.setdefault(_repo_basename(p["git_remote"]), []).append(p)
+    merged = 0
+    for p in projects:
+        key = p["canonical_key"]
+        if not key.startswith("path:") or p.get("git_remote"):
+            continue
+        name = _repo_basename(p.get("root_path") or key.split(":", 1)[1])
+        cands = remote_by_name.get(name)
+        if not cands or len(cands) != 1 or cands[0]["id"] == p["id"]:
+            continue
+        store.reassign_sessions(p["id"], cands[0]["id"])
+        _wipe_project(store, p["id"])  # drop any stale derived rows before delete
+        store.delete_project(p["id"])
+        merged += 1
+    if merged:
+        store.commit()
+    return merged
 
 
 def _wipe_all(store: Store) -> None:

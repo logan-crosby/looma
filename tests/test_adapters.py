@@ -61,3 +61,24 @@ class CursorWorkspaceRecoveryTest(unittest.TestCase):
         # too-shallow common ancestor is not a project
         self.assertIsNone(_common_root(["/Users/a.js", "/tmp/b.js"]))
         self.assertIsNone(_common_root([]))
+
+    def test_paths_from_composer_reads_edited_files(self):
+        # V2.1: recover workspace from the files a session edited when it carries
+        # no workspaceUris (the common case for Cursor sessions)
+        from looma.adapters.cursor import _paths_from_composer, _common_root
+        cd = {
+            "originalFileStates": {
+                "file:///Users/x/proj/src/a.ts": {"isNewlyCreated": False},
+                "file:///Users/x/proj/src/b.ts": {"isNewlyCreated": False},
+            },
+            "newlyCreatedFiles": [
+                {"uri": {"fsPath": "/Users/x/proj/src/c.ts",
+                         "external": "file:///Users/x/proj/src/c.ts"}}
+            ],
+            "allAttachedFileCodeChunksUris": ["file:///Users/x/proj/README.md"],
+        }
+        paths = _paths_from_composer(cd)
+        self.assertIn("/Users/x/proj/src/a.ts", paths)
+        self.assertIn("/Users/x/proj/src/c.ts", paths)
+        self.assertIn("/Users/x/proj/README.md", paths)
+        self.assertEqual(_common_root(paths), "/Users/x/proj")

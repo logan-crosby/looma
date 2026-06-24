@@ -66,6 +66,10 @@ _SYNTHETIC_PROMPT = re.compile(
     r"extract structured project memory|reply with only|respond with only|"
     r"output only|return only the|in this exact format|"
     r"you are an? (?:helpful|world-class|senior|expert|coding|summariz)|"
+    r"you are an? [\w ,'-]{0,40}\bagent\b|"               # "you are a <X> agent" (subagent prompt)
+    r"review this change for security vulnerab|"          # automated security-review bot
+    r"you previously flagged|"                            # vuln re-flagging subagent
+    r"^## context usage|"                                 # context-usage health report
     r"your task is to (?:summariz|extract|classif|rewrite|compress|score|rank)"
 )
 

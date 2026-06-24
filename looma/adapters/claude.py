@@ -48,24 +48,36 @@ def decode_encoded_cwd(dirname: str) -> Optional[str]:
     return path if os.path.exists(path) else None
 
 
-def _flatten_content(content) -> tuple[str, list[dict]]:
-    """Return (text, tool_calls) from a Claude message content (str or block list)."""
+def _flatten_content(content) -> tuple[str, list[dict], bool]:
+    """Return (text, tool_calls, tool_result_only) from a Claude message content.
+
+    tool_result_only is True when the body is entirely tool output with no
+    human-authored text. Claude delivers tool results as role 'user', but the
+    user is not speaking - the caller retags these as role 'tool' so intent,
+    memory, and decision extraction ignore the noise. (V2.1)
+    """
     if isinstance(content, str):
-        return content, []
+        return content, [], False
     if not isinstance(content, list):
-        return "", []
+        return "", [], False
     texts, tools = [], []
+    has_text = False
+    has_tool_result = False
     for block in content:
         if not isinstance(block, dict):
             continue
         bt = block.get("type")
         if bt == "text":
-            texts.append(block.get("text", ""))
+            t = block.get("text", "")
+            texts.append(t)
+            if t.strip():
+                has_text = True
         elif bt == "thinking":
             texts.append(block.get("thinking", ""))
         elif bt == "tool_use":
             tools.append({"name": block.get("name"), "input": block.get("input") or {}})
         elif bt == "tool_result":
+            has_tool_result = True
             c = block.get("content")
             if isinstance(c, str):
                 texts.append(c)
@@ -73,7 +85,7 @@ def _flatten_content(content) -> tuple[str, list[dict]]:
                 for sub in c:
                     if isinstance(sub, dict) and sub.get("type") == "text":
                         texts.append(sub.get("text", ""))
-    return "\n".join(t for t in texts if t), tools
+    return "\n".join(t for t in texts if t), tools, (has_tool_result and not has_text)
 
 
 class ClaudeAdapter:
@@ -115,8 +127,11 @@ class ClaudeAdapter:
                 msg = rec.get("message") or {}
                 if not isinstance(msg, dict):
                     msg = {}
-                text, tools = _flatten_content(msg.get("content"))
+                text, tools, tool_only = _flatten_content(msg.get("content"))
                 role = msg.get("role") or rtype
+                # tool results arrive as role 'user' but are not the user speaking
+                if role == "user" and tool_only:
+                    role = "tool"
                 uuid = rec.get("uuid")
                 seq += 1
                 yield NormalizedEvent(

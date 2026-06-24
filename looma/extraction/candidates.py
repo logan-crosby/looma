@@ -59,6 +59,13 @@ _BUG_NOT = re.compile(
     r"|\bregression[\s_.-]?test|\.test\.|are not (?:service )?crashes"
 )
 _ALPHA_WORD = re.compile(r"[A-Za-z]{2,}")
+# A line that opens as an affirmation / acknowledgement / filler is never a useful
+# memory, even when it name-drops a keyword like "tradeoff" or "instead of"
+# ("Yes. That's the right tradeoff."). Trims the weakest decision/arch items. (V2.1)
+_LOW_VALUE = re.compile(
+    r"(?i)^(?:yes|no|yeah|yep|nope|ok|okay|sure|right|correct|exactly|agreed|true|"
+    r"nice|great|perfect|awesome|got it|thanks|thank you|cool|good|hmm|i see)\b[\s,.!:;-]"
+)
 # file/log dumps and memory-log lines start with a bare line number or a
 # "<n> <date>" stamp (Looma's own memory format) - never human prose. A real
 # numbered list uses "5." (digit+period), which this does not match.
@@ -90,6 +97,8 @@ def extract_candidates(messages: list[dict]) -> list[dict]:
             if not (12 <= len(line) <= _MAX_LINE):
                 continue
             if _SKIP.search(line) or is_noise(line) or _LINE_DUMP.search(line):
+                continue
+            if _LOW_VALUE.match(line):
                 continue
             if looks_like_code(line) or line.count("*") >= 2 or line.count("|") >= 2:
                 # code/diff fragments, markdown-bolded spec text, and table rows

@@ -4,6 +4,44 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
+## [2.1.0] - 2026-06-23
+
+Extraction and identity accuracy, driven by testing the v2.0.0 release as a fresh
+install against a real 639-session, 79k-message, three-agent corpus.
+
+### Fixed
+- Tool results are no longer mistaken for the user. Claude Code delivers tool
+  results as `role: user` turns (in one project, 201 of them versus 35 real human
+  messages); they were polluting work-item titles, decision extraction, and `ask`.
+  They are now retagged so extraction reads what the human actually said, while the
+  text stays stored and searchable.
+- `ask` now returns the relevant memory or work item for concrete queries that
+  previously came back empty - it was being starved by the noise above, not
+  fundamentally broken.
+
+### Changed
+- Project identity recovery for sessions run from an ephemeral working directory
+  (for example a shell started in `/tmp`): the project is recovered from the files
+  the session actually touched. Programmatic / automated sessions (memory
+  summarizers, review bots, extraction calls) are bucketed as `Automated (<source>)`
+  separately from genuinely unresolved work, so `Unsorted` reflects real work.
+  Across the test corpus, unresolved real sessions dropped from 383 to 32.
+- Cursor workspace recovery now reads the files a session edited
+  (`originalFileStates`, newly created files) when no workspace is recorded,
+  resolving far more Cursor sessions to their real project.
+- Work-item titles capture more real intent: broadened the set of recognized
+  action verbs, with guards so pasted shell commands and flags never become a
+  title.
+- Automated-session detection now also catches security-review bots, memory and
+  subagent prompts, and usage reports.
+- Confidence band labels recalibrated to the score distribution the model actually
+  produces, so the label distinguishes thin single-session items from corroborated
+  ones instead of marking nearly everything "low". Scores, promotion, and ranking
+  are unchanged.
+- Duplicate projects are reconciled: a remote-less local checkout folds into the
+  canonical project sharing its repository name, when the match is unambiguous.
+- Trimmed low-value extracted memories (bare acknowledgements and filler).
+
 ## [2.0.0] - 2026-06-22
 
 The agent context layer. Make Looma the default, grounded context source for

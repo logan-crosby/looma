@@ -3,9 +3,16 @@
 import os
 from pathlib import Path
 
-# Confidence bands (ARCHITECTURE.md section 5.4).
-BAND_HIGH = 0.75
-BAND_LOW = 0.40
+# Confidence bands - the human-readable label only (cli.py, ask.py); they do NOT
+# gate promotion, ranking, or resume (resume gates on MATCH relevance, below).
+# The score (confidence.py) weights commit linkage + session/agent breadth, which
+# are structurally ~0 for solo, single-session, locally-committed work - so the
+# real corpus distribution tops out near ~0.46, not 1.0. Calibrating the bands to
+# that range keeps the label informative (separating thin single-session items
+# from corroborated multi-session ones) instead of stamping ~95% of work "low".
+# (V2.1, ARCHITECTURE.md section 5.4.)
+BAND_HIGH = 0.30
+BAND_LOW = 0.12
 
 # Resume ambiguity thresholds (ARCHITECTURE.md section 10.1).
 # These gate on MATCH RELEVANCE (how well a WorkItem answers the goal), not the

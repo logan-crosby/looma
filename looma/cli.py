@@ -108,6 +108,8 @@ def cmd_ingest(args) -> int:
         store, limit=args.limit, project_filter=project_filter, verbose=args.verbose
     )
     t1 = time.perf_counter()
+    if not project_filter:
+        pipeline.reconcile_projects(store)
     built = pipeline.rebuild(store)
     t2 = time.perf_counter()
     counts = store.counts()

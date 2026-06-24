@@ -69,6 +69,19 @@ class Store:
             (project_id, kind, alias),
         )
 
+    def reassign_sessions(self, from_pid: int, to_pid: int) -> int:
+        """Move all sessions from one project to another (project reconciliation)."""
+        cur = self.conn.execute(
+            "UPDATE sessions SET project_id=? WHERE project_id=?", (to_pid, from_pid)
+        )
+        return cur.rowcount
+
+    def delete_project(self, pid: int) -> None:
+        """Remove a project row and its aliases. Caller must first move its sessions
+        away and wipe its derived rows (FK-safe)."""
+        self.conn.execute("DELETE FROM project_aliases WHERE project_id=?", (pid,))
+        self.conn.execute("DELETE FROM projects WHERE id=?", (pid,))
+
     def find_project_by_key(self, canonical_key: str) -> Optional[dict]:
         row = self.conn.execute(
             "SELECT * FROM projects WHERE canonical_key=?", (canonical_key,)

@@ -16,7 +16,9 @@ from ..util import jaccard, prettify_label, text_sim
 _INTENT = re.compile(
     r"(?i)\b(implement(?:ing)?|build(?:ing)?|creat(?:e|ing)|add(?:ing)?|fix(?:ing)?|"
     r"refactor(?:ing)?|migrat(?:e|ing)|investigat(?:e|ing)|debug(?:ging)?|"
-    r"continu(?:e|ing)|set(?:ting)? up|wir(?:e|ing) up|switch(?:ing)? to)\b\s+(.{3,60})"
+    r"continu(?:e|ing)|set(?:ting)? up|wir(?:e|ing) up|switch(?:ing)? to|"
+    r"updat(?:e|ing)|chang(?:e|ing)|remov(?:e|ing)|improv(?:e|ing)|"
+    r"review(?:ing)?|audit(?:ing)?|writ(?:e|ing)|run(?:ning)?|mak(?:e|ing))\b\s+(.{3,60})"
 )
 # verb-stem -> canonical verb (so -ing/-ion forms map to the right kind/label)
 _VERB_STEM = [
@@ -24,6 +26,9 @@ _VERB_STEM = [
     ("debug", "debug"), ("implement", "implement"), ("continu", "continue"),
     ("switch", "switch to"), ("creat", "create"), ("build", "build"),
     ("set", "set up"), ("wir", "wire up"), ("add", "add"), ("fix", "fix"),
+    ("updat", "update"), ("chang", "change"), ("remov", "remove"),
+    ("improv", "improve"), ("review", "review"), ("audit", "audit"),
+    ("writ", "write"), ("run", "run"), ("mak", "make"),
 ]
 _CODEISH = re.compile(r"[{}<>=+|;`\\]")
 # SQL/DDL and dotted-identifier / quoted-ternary patterns the verb regex would
@@ -54,10 +59,14 @@ _KIND = {
     "fix": "bugfix", "debug": "bugfix",
     "refactor": "refactor",
     "migrate": "migration",
-    "investigate": "investigation",
+    "investigate": "investigation", "audit": "investigation", "review": "investigation",
 }
 _GENERIC_BRANCH = {"", "head", "main", "master", "develop", "dev"}
 _STOP_TAIL = re.compile(r"(?i)\b(so that|because|in order to|using|with the|and then|to make)\b.*$")
+# a pasted shell command is not user intent ("npm audit fix --force", "make build")
+_CMD_LINE = re.compile(r"(?i)^(?:sudo\s+)?(?:npm|yarn|pnpm|npx|bun|git|cargo|pip3?|"
+                       r"python3?|node|docker|make|brew|gh|go|uv|pytest)\b")
+_CLI_FLAG = re.compile(r"(?:^|\s)--?[A-Za-z]")
 
 
 def _intent(messages: list[dict]) -> tuple[Optional[str], str]:
@@ -72,7 +81,7 @@ def _intent(messages: list[dict]) -> tuple[Optional[str], str]:
             line = line.strip()
             # whole-line rejects: code/diff/log lines and pasted SQL/JSX never
             # carry the user's intent, even when they contain an imperative verb.
-            if looks_like_code(line) or _NOT_INTENT.search(line):
+            if looks_like_code(line) or _NOT_INTENT.search(line) or _CMD_LINE.match(line):
                 continue
             match = _INTENT.search(line)
             if not match:
@@ -87,7 +96,7 @@ def _intent(messages: list[dict]) -> tuple[Optional[str], str]:
             tail = _LEAD_FILLER.sub("", tail).strip()
             # reject code fragments and tails without at least two real words
             if (not tail or _CODEISH.search(tail) or _NOT_INTENT.search(tail)
-                    or len(_ALPHA_TOK.findall(tail)) < 2):
+                    or _CLI_FLAG.search(tail) or len(_ALPHA_TOK.findall(tail)) < 2):
                 continue
             kind = _KIND.get(verb, "feature")
             return f"{verb} {tail}".strip()[:60], kind

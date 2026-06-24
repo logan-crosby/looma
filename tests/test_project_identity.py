@@ -49,5 +49,42 @@ class ProjectIdentityTest(unittest.TestCase):
             self.assertIsNotNone(identity.resolve(sub))
 
 
+class _Ev:
+    """Minimal NormalizedEvent stub: resolve_from_events only reads tool_calls."""
+
+    def __init__(self, *file_paths):
+        self.tool_calls = [
+            {"name": "Read", "input": {"file_path": p}} for p in file_paths
+        ]
+
+
+class ResolveFromEventsTest(unittest.TestCase):
+    def test_recovers_project_from_touched_files_under_temp(self):
+        # cwd was /tmp, but the real work was in a cloned repo under it
+        events = [
+            _Ev("/tmp/hunt-mem0/mem0/client.py"),
+            _Ev("/tmp/hunt-mem0/tests/test_client.py"),
+        ]
+        ident = identity.resolve_from_events(events)
+        self.assertIsNotNone(ident)
+        self.assertEqual(ident["display_name"], "hunt-mem0")
+
+    def test_dominant_directory_wins(self):
+        events = [
+            _Ev("/tmp/hunt-mem0/a.py", "/tmp/hunt-mem0/b.py", "/tmp/hunt-mem0/c.py"),
+            _Ev("/tmp/scratch-other/z.py"),
+        ]
+        ident = identity.resolve_from_events(events)
+        self.assertEqual(ident["display_name"], "hunt-mem0")
+
+    def test_harness_scratchpad_is_not_a_project(self):
+        # files only under the harness scratchpad -> no recoverable project
+        events = [_Ev("/private/tmp/claude-501/abc/session/scratchpad/note.md")]
+        self.assertIsNone(identity.resolve_from_events(events))
+
+    def test_no_touched_files_returns_none(self):
+        self.assertIsNone(identity.resolve_from_events([_Ev()]))
+
+
 if __name__ == "__main__":
     unittest.main()

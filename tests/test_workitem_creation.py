@@ -49,6 +49,24 @@ class WorkItemCreationTest(unittest.TestCase):
         items = wi.resolve([s])
         self.assertIn("OAuth", items[0]["title"])
 
+    def test_extended_verbs_captured(self):
+        # V2.1: broadened intent verbs lift title recall on real human phrasing
+        for msg, want in [
+            ("update the project to the latest tech stack", "update"),
+            ("review the auth flow before implementation", "review"),
+            ("run the mineru pass and compare outputs", "run"),
+        ]:
+            s = _sig(1, "HEAD", ["x/y.py"], [msg])
+            self.assertIsNotNone(s["label"], msg)
+            self.assertTrue(s["label"].lower().startswith(want), s["label"])
+
+    def test_pasted_shell_command_is_not_intent(self):
+        # "npm audit fix --force" must not become a work-item title
+        s = _sig(1, "HEAD", ["pkg/a.js"], ["npm audit fix --force"])
+        self.assertIsNone(s["label"])
+        items = wi.resolve([s])
+        self.assertNotIn("--force", items[0]["title"])
+
 
 if __name__ == "__main__":
     unittest.main()

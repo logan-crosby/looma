@@ -38,6 +38,31 @@ def _uri_to_path(u: str):
     return None
 
 
+def _paths_from_composer(cd: dict) -> list[str]:
+    """Absolute paths of files the session edited or attached - used to recover the
+    workspace when no bubble carries a workspaceUris. Cursor scatters these across
+    several composer fields; we read the reliable file-edit ones. (V2.1)
+    """
+    paths = []
+    ofs = cd.get("originalFileStates")  # dict keyed by file:// URI of each edited file
+    if isinstance(ofs, dict):
+        for uri in ofs:
+            p = _uri_to_path(uri)
+            if p:
+                paths.append(p)
+    for item in cd.get("newlyCreatedFiles") or []:  # {uri: {fsPath, external, path}}
+        uri = item.get("uri") if isinstance(item, dict) else None
+        if isinstance(uri, dict):
+            p = uri.get("fsPath") or uri.get("path") or _uri_to_path(uri.get("external") or "")
+            if isinstance(p, str) and p.startswith("/"):
+                paths.append(p)
+    for u in cd.get("allAttachedFileCodeChunksUris") or []:
+        p = _uri_to_path(u)
+        if p:
+            paths.append(p)
+    return paths
+
+
 def _common_root(paths: list[str]):
     """Deepest directory containing all given file paths (the workspace root).
 
@@ -97,10 +122,10 @@ class CursorAdapter:
         except (json.JSONDecodeError, ValueError, TypeError):
             return
         headers = cd.get("fullConversationHeadersOnly") or []
-        # composer-level workspace fallback: the common parent of attached files,
-        # used when no bubble carries a workspaceUris (V2 Phase 2 identity hygiene)
-        attached = [p for p in (_uri_to_path(u) for u in (cd.get("allAttachedFileCodeChunksUris") or [])) if p]
-        composer_root = _common_root(attached)
+        # composer-level workspace fallback: the common parent of the files the
+        # session edited/attached, used when no bubble carries a workspaceUris
+        # (V2 Phase 2 identity hygiene; V2.1 widened beyond attached chunks).
+        composer_root = _common_root(_paths_from_composer(cd))
         project_root = None
         seq = 0
         events: list[NormalizedEvent] = []
