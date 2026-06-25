@@ -7,7 +7,7 @@ repo. Built from existing WorkItems / memories / commits; adds nothing new.
 
 from datetime import datetime, timedelta
 
-from .sanitize import looks_like_code
+from .sanitize import looks_like_code, looks_like_meta
 from .util import to_ascii
 
 
@@ -34,12 +34,17 @@ def _active_projects(store, since):
 
 def _clean_titles(rows, limit, drop_resolved=False):
     import re
-    resolved = re.compile(r"(?i)^\s*(?:i\s+)?(?:fixed|resolved|implemented|done)\b")
+    # a blocker that narrates finished work is not "unresolved": leading
+    # fixed/resolved/done, a "... done:" hand-off, or a passing test/check run.
+    resolved = re.compile(
+        r"(?i)^\s*(?:i\s+)?(?:fixed|resolved|implemented|done)\b"
+        r"|\bdone\s*:"
+        r"|\b(?:both|all|tests?|checks?|the suite)\s+pass(?:ed|es)?\b")
     out, seen = [], set()
     for r in rows:
         t = to_ascii((r["title"] or "").strip())
         k = t.lower()
-        if not t or k in seen or looks_like_code(t):
+        if not t or k in seen or looks_like_code(t) or looks_like_meta(t):
             continue
         if drop_resolved and resolved.search(t):
             continue

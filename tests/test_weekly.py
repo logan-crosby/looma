@@ -47,6 +47,32 @@ class WeeklyTest(unittest.TestCase):
             self.assertIn(h, out)
         self.assertTrue(out.isascii())
 
+    def test_weekly_drops_completed_blockers_and_meta_decisions(self):
+        pid, wid = self._project_with_activity("path:/c", "gamma")
+        # blockers that are actually finished work must not read as "unresolved"
+        for done in ["Next step done: uploaded PDFs are ingested now",
+                     "Final smoke and cleanup checks passed cleanly"]:
+            self.store.insert_entity(pid, kind="todo", title=done,
+                                     work_item_id=wid, status="open", confidence=0.5)
+        self.store.insert_entity(pid, kind="todo", title="Add a timeout to outbound calls",
+                                 work_item_id=wid, status="open", confidence=0.5)
+        # an ascii-diagram "decision" (Looma's own source) must be filtered
+        self.store.insert_entity(pid, kind="decision",
+                                 title="Decision --CONSTRAINS--> [ WorkItem ] <--BLOCKS-- Todo",
+                                 work_item_id=wid, status="open", confidence=0.5)
+        self.store.insert_entity(pid, kind="decision", title="Use Redis over Memcached",
+                                 work_item_id=wid, status="open", confidence=0.5)
+        self.store.commit()
+
+        w = weekly_mod.build(self.store, days=3650)
+        btitles = [b["title"] for b in w["blockers"]]
+        self.assertIn("Add a timeout to outbound calls", btitles)
+        self.assertNotIn("Next step done: uploaded PDFs are ingested now", btitles)
+        self.assertNotIn("Final smoke and cleanup checks passed cleanly", btitles)
+        dtitles = [d["title"] for d in w["decisions"]]
+        self.assertIn("Use Redis over Memcached", dtitles)
+        self.assertNotIn("Decision --CONSTRAINS--> [ WorkItem ] <--BLOCKS-- Todo", dtitles)
+
     def test_weekly_empty(self):
         w = weekly_mod.build(self.store, days=7)
         self.assertTrue(w["empty"])

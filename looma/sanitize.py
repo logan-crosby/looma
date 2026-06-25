@@ -105,6 +105,31 @@ _ALPHA_RUN = re.compile(r"[A-Za-z]{3,}")
 _FILE_EXT = re.compile(r"\.[A-Za-z0-9]{1,5}$")
 
 
+# Transcript structure and agent-directed meta that slip past the code/noise
+# filters but are never real memories: raw role-prefixed turns ("[346] assistant:
+# ..."), ascii arrow/graph diagrams ("A --> [ B ] <-- C"), quoted-vocabulary
+# listings (Looma's own pattern source ingested from its dev sessions), dangling
+# preambles that promise content after a trailing colon ("... decision is:"),
+# agent-directed imperatives ("move on to the next step"), and greetings. These
+# were real false positives in `looma weekly` decisions/blockers. (V2.1.2)
+_META = re.compile(
+    r"(?i)"
+    r"^\s*\[?\d{1,7}\]?\s*(?:assistant|user|human|tool|system)\b\s*:?|"   # [346] assistant: ...
+    r"^\s*(?:assistant|user|human|tool|system)\s*:|"                       # assistant: ...
+    r"--+>|<--+|"                                                          # ascii arrows / graph edges
+    r'(?:"[^"]+"\s*,\s*){2,}|'                                             # "a", "b", quoted-vocab list
+    r"\b(?:is|are|following|below|here|these|as follows|includes?|done)\s*:\s*$|"  # dangling preamble ":"
+    r"^\s*(?:now,?\s+)?(?:move on|moving on|let'?s move on|next up)\b|"     # agent imperative
+    r"^\s*(?:continue|proceed|go ahead|carry on)\b[^.]*\bnext\b|"          # "continue ... next step"
+    r"^\s*(?:hi|hey|hello|good (?:morning|afternoon|evening)|thanks|thank you|where were we)\b"  # greeting
+)
+
+
+def looks_like_meta(text: str) -> bool:
+    """True if text is transcript structure or agent-directed meta, not a memory."""
+    return bool(_META.search((text or "").strip()))
+
+
 def looks_like_code(text: str) -> bool:
     """True if text reads like a code/diff/log line rather than human prose.
 

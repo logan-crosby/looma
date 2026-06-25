@@ -8,7 +8,8 @@ promotion (section 5) moves corroborated ones into the graph.
 import re
 from typing import Optional
 
-from ..sanitize import is_noise, looks_like_code, strip_injected
+from ..sanitize import is_noise, looks_like_code, looks_like_meta, strip_injected
+from ..util import to_ascii
 
 # Ordered so the strongest/most-specific kind wins when several match a line.
 # Bug patterns require an explicit problem assertion - never a bare "fix"/"error",
@@ -58,6 +59,22 @@ _BUG_NOT = re.compile(
     r"|\b(?:no|without|zero|any|eliminates?|avoids?|prevents?|not a) (?:\w+ )?(?:regression|crash|failure|error)"
     r"|\bregression[\s_.-]?test|\.test\.|are not (?:service )?crashes"
 )
+# Action narration: the assistant announcing its own next move ("Let me check
+# ...", "Now I will ..."). Never a decision, todo, OR bug symptom, so this applies
+# to every kind. Anchored at the start and deliberately excludes "let's use X over
+# Y" (a real decision) and bare "I'm <symptom>" (can be a real bug). (V2.1.2)
+_ACTION = re.compile(
+    r"(?i)^\s*(?:let me |now i |first,? i |next,? i |i'?m going to |i am going to |i'?m gonna )"
+)
+# First-person progress narration ("I'm checking ...", "I've done ...", "Both
+# pass.") describes activity in flight, not a durable decision or open task. The
+# analogue of _BUG_NOT, applied to the decision/architecture/todo kinds. Anchored
+# at the line start to stay conservative and avoid dropping real choices that
+# merely mention "I". (V2.1.2)
+_NARRATION = re.compile(
+    r"(?i)^\s*(?:i'?m |i am |i'?ll |we'?ll |now i |i just |i then |i'?ve |i have )"
+    r"|^\s*(?:both|all|tests?|checks?|the suite)\s+(?:pass|passed|passes)\b"
+)
 _ALPHA_WORD = re.compile(r"[A-Za-z]{2,}")
 # A line that opens as an affirmation / acknowledgement / filler is never a useful
 # memory, even when it name-drops a keyword like "tradeoff" or "instead of"
@@ -93,10 +110,15 @@ def extract_candidates(messages: list[dict]) -> list[dict]:
             continue
         text = strip_injected(m.get("text") or "")
         for raw_line in text.splitlines():
-            line = _clean(raw_line)
+            # fold smart quotes/dashes to ASCII first: the heuristic patterns
+            # (won't, can't, let's, I'm, ...) assume a straight apostrophe, and a
+            # curly one would silently defeat every one of them.
+            line = to_ascii(_clean(raw_line))
             if not (12 <= len(line) <= _MAX_LINE):
                 continue
             if _SKIP.search(line) or is_noise(line) or _LINE_DUMP.search(line):
+                continue
+            if looks_like_meta(line):
                 continue
             if _LOW_VALUE.match(line):
                 continue
@@ -108,8 +130,14 @@ def extract_candidates(messages: list[dict]) -> list[dict]:
             kind = _classify(line)
             if not kind:
                 continue
+            # the assistant announcing its next move is never a memory of any kind
+            if _ACTION.search(line):
+                continue
             # completed-fix narration, negated problems, and test names are not bugs
             if kind == "bug" and _BUG_NOT.search(line):
+                continue
+            # progress narration is not a decision/architecture/todo
+            if kind != "bug" and _NARRATION.search(line):
                 continue
             key = (kind, line.lower())
             if key in seen:

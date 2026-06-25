@@ -71,5 +71,100 @@ class BugPrecisionTest(unittest.TestCase):
             "Architecturally, the leader election must be idempotent so a re-run is safe.")))
 
 
+class MetaNoiseTest(unittest.TestCase):
+    """Transcript structure and agent-directed meta must never become memories.
+    Lines below are real false positives observed in `looma weekly` decisions /
+    blockers (role-prefixed turns, ascii arrow diagrams, Looma's own pattern
+    vocabulary ingested from dev sessions, dangling preambles, agent imperatives,
+    greetings). (V2.1.2)"""
+
+    META = [
+        "[346] assistant: I'm adding tests first around the worker routing",
+        "assistant: let me check the worktree now",
+        "Decision --CONSTRAINS--> [ WorkItem ] <--BLOCKS-- Todo",
+        '* "we decided", "decision", "use X instead of Y"',
+        "For your lab, the most important design decision is:",
+        "Next step is done:",
+        "Now, move on to the next step then",
+        "Continue to the next step now",
+        "Hey! Good Morning. Where were we and what were we doing?",
+    ]
+    REAL = [
+        "We decided to use JWT over opaque tokens for the session layer.",
+        "Architecturally, the leader election must be idempotent so a re-run is safe.",
+        "The export button does not work on Safari and never triggers a download.",
+        "Continue supporting the legacy v1 API until the Q3 migration lands.",
+    ]
+
+    def test_meta_lines_flagged(self):
+        for line in self.META:
+            self.assertTrue(sanitize.looks_like_meta(line),
+                            f"should flag meta: {line!r}")
+
+    def test_real_memories_not_flagged(self):
+        for line in self.REAL:
+            self.assertFalse(sanitize.looks_like_meta(line),
+                             f"should NOT flag real memory: {line!r}")
+
+    def test_meta_lines_never_become_candidates(self):
+        for line in self.META:
+            self.assertEqual(_kinds(line), [], f"should yield no candidate: {line!r}")
+
+    def test_real_memories_still_extracted(self):
+        for line in self.REAL[:2]:  # decision + architecture lines carry a kind
+            self.assertTrue(_kinds(line), f"should still extract: {line!r}")
+
+
+class NarrationTest(unittest.TestCase):
+    """First-person progress narration ("I'm checking ...", "Let me ...", "Both
+    pass.") is activity in flight, not a durable decision or open task - the
+    analogue of the completed-fix guard for the bug kind. (V2.1.2)"""
+
+    def test_progress_narration_is_not_a_decision_or_todo(self):
+        for line in [
+            "I'm adding tests first around the worker routing for DOCX and PPTX.",
+            "I am preparing the Ubuntu GitHub SSH connectivity now and will verify.",
+            "Let me start with the repair fail-closed bug since it is highest value.",
+            "Both pass. Let me confirm the end-to-end test is a genuine regression.",
+            "I'll switch the parser to streaming next so memory stays flat.",
+        ]:
+            kinds = [k for k, _ in _kinds(line)]
+            self.assertNotIn("decision", kinds, f"narration is not a decision: {line!r}")
+            self.assertNotIn("todo", kinds, f"narration is not a todo: {line!r}")
+            self.assertNotIn("architecture", kinds, f"narration is not architecture: {line!r}")
+
+    def test_action_narration_is_never_a_bug(self):
+        # "Let me ..." is the assistant's next move, not a symptom - even when the
+        # line name-drops a bug/crash word it must not surface as a blocker.
+        for line in [
+            "Let me check the DB state since the rebuild likely crashed earlier.",
+            "Let me add a focused test file for the extraction-quality changes.",
+            "Now I will inspect the empty-memory case before touching the parser.",
+        ]:
+            self.assertEqual(_kinds(line), [], f"action narration leaked: {line!r}")
+
+    def test_let_us_decision_survives_action_guard(self):
+        # "Let's use X over Y" is a real decision and must not be caught as action
+        self.assertTrue(any(k == "decision" for k, _ in _kinds(
+            "Let's use Postgres over SQLite for the write-heavy path.")))
+
+    def test_smart_quote_narration_is_still_caught(self):
+        # transcripts carry curly apostrophes; folding to ASCII keeps the
+        # apostrophe-bearing patterns (I'm/let's/won't) from silently missing.
+        for line in [
+            "I’m adding tests first around the worker routing for DOCX kinds.",
+            "Let’s not do that; I’ll switch the parser to streaming next.",
+        ]:
+            kinds = [k for k, _ in _kinds(line)]
+            self.assertNotIn("decision", kinds, f"smart-quote narration leaked: {line!r}")
+            self.assertNotIn("todo", kinds, f"smart-quote narration leaked: {line!r}")
+
+    def test_real_decisions_and_todos_survive_narration_guard(self):
+        self.assertTrue(any(k == "decision" for k, _ in _kinds(
+            "We decided to use JWT over opaque tokens for the session layer.")))
+        self.assertTrue(any(k == "todo" for k, _ in _kinds(
+            "We need to add a timeout to outbound calls before the release.")))
+
+
 if __name__ == "__main__":
     unittest.main()

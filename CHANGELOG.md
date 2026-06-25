@@ -4,6 +4,21 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
+## [2.1.2] - 2026-06-25
+
+### Changed
+- Sharper `weekly` and `today` retrospectives. The decision/blocker extraction
+  now rejects transcript structure and agent meta that previously leaked through:
+  role-prefixed turns ("[346] assistant: ..."), ascii arrow/graph diagrams,
+  quoted-vocabulary listings (Looma's own pattern source, ingested from its dev
+  sessions), dangling preambles that trail off after a colon, greetings, and the
+  assistant's own action narration ("Let me check ...", "I'm adding ..."). A
+  blocker that narrates finished work ("... done:", "checks passed") no longer
+  reads as unresolved.
+- Heuristic extraction now folds smart quotes to ASCII before matching, so a
+  curly apostrophe no longer silently defeats the apostrophe-bearing patterns
+  (I'm / can't / let's / won't).
+
 ## [2.1.1] - 2026-06-23
 
 ### Added
