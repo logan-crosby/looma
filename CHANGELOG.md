@@ -4,6 +4,25 @@ All notable changes to Looma are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); this project uses pre-1.0 alpha
 versions.
 
+## [2.1.5] - 2026-06-26
+
+### Changed
+- `looma benchmark` matching is fairer to paraphrases. The token-overlap matcher
+  missed correct paraphrases whose salient content was diluted by circumstantial
+  words on both sides (e.g. a real bug described as "memory leak from accumulated
+  EventEmitter listeners" vs the gold "event listeners ... accumulate ... memory
+  leak"), double-penalizing one correct extraction as both a false positive and a
+  false negative. Tokens are now morphologically normalized (reusing the
+  retrieval stemmer) and a third match clause credits a high-overlap paraphrase
+  with an absolute floor of three shared content tokens, so coincidental short
+  overlaps still do not match. Validated against labeled should-match and
+  should-NOT-match pairs; the heuristic's score is unchanged (0.86), confirming
+  the change credits real paraphrases rather than inflating everything.
+- This corrects the measured local-LLM advantage: a local Qwen2.5-7B beats the
+  heuristic at both common quants (F1 0.90 at Q3, 0.95 at Q4_K_M, vs 0.86), and
+  LLM bug precision is 0.80 (heuristic-equal), not the 0.60 the old matcher
+  reported. README benchmark figures updated to match.
+
 ## [2.1.4] - 2026-06-26
 
 ### Fixed

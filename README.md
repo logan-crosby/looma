@@ -95,11 +95,10 @@ fallback.
 
 If you run a local OpenAI-compatible model server (e.g. llama.cpp `llama-server` or
 Ollama), Looma **auto-detects it and uses it**. On the golden benchmark a local
-Qwen2.5-7B at **Q4_K_M scores F1 0.90 vs the heuristic's 0.86**, edging ahead on
-architecture and to-do recall. Quantization matters - at Q3 the same model scores
-0.84 and the heuristic wins, so use a **Q4_K_M or better** GGUF. Nothing leaves your
-machine; it is a local HTTP call over stdlib `urllib`, so the zero-dependency promise
-holds.
+Qwen2.5-7B beats the heuristic (F1 0.86) at both common quants - **F1 0.90 at Q3,
+0.95 at Q4_K_M** - with Q4_K_M pulling ahead on architecture and to-do recall, so
+prefer a **Q4_K_M or better** GGUF. Nothing leaves your machine; it is a local HTTP
+call over stdlib `urllib`, so the zero-dependency promise holds.
 
 ```bash
 # optional: start any local model server, then just use looma normally

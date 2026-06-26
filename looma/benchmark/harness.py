@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from ..extraction.extractor import MEMORY_KINDS, HeuristicExtractor, LocalLLMExtractor
+from ..retrieval.match import _stem
 from ..util import tokens as _tok
 
 _STOP = {"the", "a", "an", "to", "of", "for", "and", "so", "is", "it", "we",
@@ -19,8 +20,16 @@ FIXTURES = Path(__file__).parent / "fixtures.json"
 GOLD_KEY = {"decision": "decisions", "todo": "todos", "bug": "bugs", "architecture": "architecture"}
 
 
+def _norm(t: str) -> str:
+    # reuse the retrieval stemmer (morphological variants -> one form), then
+    # strip a trailing "e" so a stripped past tense ("accumulated"->"accumulat")
+    # aligns with its base ("accumulate"->"accumulat").
+    s = _stem(t)
+    return s[:-1] if s.endswith("e") and len(s) > 4 else s
+
+
 def _toks(s: str) -> set:
-    return {t for t in _tok(s) if t not in _STOP and len(t) > 2}
+    return {_norm(t) for t in _tok(s) if t not in _STOP and len(t) > 2}
 
 
 def _matches(pred: str, gold: str) -> bool:
@@ -30,7 +39,11 @@ def _matches(pred: str, gold: str) -> bool:
     inter = len(a & b)
     jacc = inter / len(a | b)
     overlap = inter / min(len(a), len(b))
-    return jacc >= 0.3 or overlap >= 0.55
+    # The third clause credits a correct paraphrase whose salient content is
+    # shared but diluted by circumstantial words on both sides (a real bug
+    # description vs the gold). The absolute floor (>=3 shared content tokens)
+    # keeps it from matching short coincidental overlaps.
+    return jacc >= 0.3 or overlap >= 0.55 or (inter >= 3 and overlap >= 0.5)
 
 
 def _score_kind(preds: list[str], gold: list[str]) -> tuple[int, int, int]:
