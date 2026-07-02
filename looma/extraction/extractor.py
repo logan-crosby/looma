@@ -8,6 +8,11 @@ Both implementations return the SAME schema so they are interchangeable and
 benchmarkable. HeuristicExtractor reuses the existing deterministic logic (no
 duplication). LocalLLMExtractor talks to a fully-local model server (llama.cpp
 llama-server or Ollama) - no hosted API - and falls back to heuristic on any error.
+
+Model detection tries backends in priority order (erebos direct Tailscale HTTP →
+erebos SSH tunnel → local Ollama → llama.cpp), so the same code works whether
+the model is served from a remote desktop (erebos via Tailscale or SSH tunnel)
+or locally on this machine.
 """
 
 import functools
@@ -67,13 +72,34 @@ Now do the same for this transcript:
 JSON:"""
 
 
+# Cached model name from the last successful detect_server() probe — so
+# _call() uses the same model that detection found, without needing an env var.
+_detected_model: Optional[str] = None
+
+# Backend URLs tried in priority order when LOOMA_LLM_URL is not explicitly set.
+# Port assignments (compatible with claude-qwen conventions — see ~/.zshrc):
+#   desktop-cf5rf9b:11434 — erebos direct HTTP via Tailscale MagicDNS (primary)
+#   11334 — Ollama tunneled from erebos (SSH -L 11334:127.0.0.1:11434)
+#   11434 — Ollama running locally on this machine (also used by claude-qwen-local)
+#   8080  — llama.cpp llama-server (legacy)
+_BACKEND_URLS: tuple[str, ...] = (
+    "http://desktop-cf5rf9b:11434/v1/chat/completions",  # erebos direct (Tailscale)
+    "http://localhost:11334/v1/chat/completions",         # erebos tunnel (SSH -L)
+    "http://localhost:11434/v1/chat/completions",         # local Ollama
+    "http://localhost:8080/v1/chat/completions",          # llama.cpp (legacy)
+)
+
+
 def _local_url() -> str:
-    # llama.cpp llama-server default :8080, Ollama :11434; both OpenAI-compatible.
-    return os.environ.get("LOOMA_LLM_URL", "http://localhost:8080/v1/chat/completions")
+    # Ollama serves on :11434 by default; llama.cpp on :8080.
+    # Set LOOMA_LLM_URL explicitly to override the entire probe list.
+    return os.environ.get("LOOMA_LLM_URL", "http://localhost:11434/v1/chat/completions")
 
 
 def _model() -> str:
-    return os.environ.get("LOOMA_LLM_MODEL", "local")
+    # Env override → detected model → sensible default (qwen2.5-coder:7b,
+    # the model proven at 0.92 F1 on this benchmark).
+    return os.environ.get("LOOMA_LLM_MODEL", _detected_model or "qwen2.5-coder:7b")
 
 
 def _transcript(messages: list[dict], max_chars: int = 6000) -> str:
@@ -180,18 +206,39 @@ def detect_server(base_url: Optional[str] = None):
     """Probe for a reachable local OpenAI-compatible model server.
 
     Returns (ok: bool, model_name | None). Cached per process: a short-lived CLI
-    probes once. Pure stdlib (urllib) - no new dependency. Short timeout so the
+    probes once. Pure stdlib (urllib) — no new dependency. Short timeout so the
     zero-dependency default path stays fast when no server is running.
+
+    When `base_url` is explicitly provided (LOOMA_LLM_URL env var), probes only
+    that URL. Otherwise tries multiple URLs in priority order: erebos tunnel
+    on :11334, local Ollama on :11434, llama.cpp on :8080. The first reachable
+    server with a model loaded wins.
     """
-    url = base_url or _local_url()
-    models = url.rsplit("/chat/completions", 1)[0].rstrip("/") + "/models"
-    try:
-        with urllib.request.urlopen(models, timeout=0.6) as r:
-            data = json.loads(r.read())
-        mid = (data.get("data") or [{}])[0].get("id")
-        return (True, (mid.split("/")[-1] if mid else "local"))
-    except Exception:
-        return (False, None)
+    global _detected_model
+
+    urls = (base_url,) if base_url else _BACKEND_URLS
+
+    for url in urls:
+        models_url = url.rsplit("/chat/completions", 1)[0].rstrip("/") + "/models"
+        try:
+            with urllib.request.urlopen(models_url, timeout=0.6) as r:
+                data = json.loads(r.read())
+        except Exception:
+            continue
+
+        # Ollama shape: {"data": [{"id": "qwen2.5-coder:7b", ...}]}
+        # llama.cpp shape may differ; accept either.
+        items = data.get("data") or data.get("models") or []
+        if not items:
+            # Server is up but no models loaded — try next URL
+            continue
+        mid = items[0].get("id") or items[0].get("name") or ""
+        model = mid.split("/")[-1] if mid else "local"
+        _detected_model = model
+        return (True, model)
+
+    _detected_model = None
+    return (False, None)
 
 
 def get_extractor(name: Optional[str] = None):

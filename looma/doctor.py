@@ -68,6 +68,41 @@ def _model_server() -> tuple[str, str, str]:
             "For best extraction run e.g. `llama-server -m <model.gguf> --port 8080`.")
 
 
+def _erebos_server() -> tuple[str, str, str]:
+    """Probe erebos Ollama directly — both Tailscale direct and SSH tunnel."""
+    import json, urllib.request
+
+    # Probe order: direct Tailscale HTTP (primary), then SSH tunnel (fallback).
+    probes = (
+        ("http://desktop-cf5rf9b:11434/api/tags", "direct Tailscale"),
+        ("http://localhost:11334/api/tags",       "SSH tunnel"),
+    )
+    for url, label in probes:
+        try:
+            with urllib.request.urlopen(url, timeout=2.0) as r:
+                data = json.loads(r.read())
+        except Exception:
+            continue
+        items = data.get("models") or data.get("data") or []
+        if not items:
+            continue
+        model = items[0].get("name") or items[0].get("id") or "unknown"
+        return ("Erebos model server", OK,
+                f"{model} reachable via {label}")
+    # Try to identify why erebos is down
+    hints = []
+    for url, label in probes:
+        try:
+            with urllib.request.urlopen(url, timeout=1.0) as r:
+                pass  # reachable but no models loaded
+            hints.append(f"  {label}: server up, no models loaded")
+        except Exception as e:
+            hints.append(f"  {label}: {e.__class__.__name__} ({e.strerror if hasattr(e,'strerror') and e.strerror else 'timeout/unreachable'})")
+    hint_str = "\n".join(hints)
+    return ("Erebos model server", WARN,
+            f"unreachable — LLM extraction will use heuristic fallback.\n{hint_str}")
+
+
 def _git_repo() -> tuple[str, str, str]:
     root = gitutil.repo_root(os.getcwd())
     if root:
@@ -87,4 +122,5 @@ def run(db_path) -> list[tuple[str, str, str]]:
         _claude_history(),
         _git_repo(),
         _model_server(),
+        _erebos_server(),
     ]
