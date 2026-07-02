@@ -1,5 +1,6 @@
 """looma CLI - init, ingest, work, resume, ask, status, doctor, reset (+ reprocess)."""
 
+import sqlite3  # for OperationalError catch
 import argparse
 import os
 import sys
@@ -22,8 +23,15 @@ def _open_store(args) -> Store:
     # Always migrate: a fresh DB (user ran a command before `looma init`) must
     # work, not crash with "no such table". migrate() is idempotent and cheap, so
     # `init` becomes optional - one less step before the first answer.
+    #
+    # When the daemon is actively ingesting, migrate() can contend on the write
+    # lock (even in WAL mode). Degrade gracefully: skip migration when locked and
+    # rely on the daemon having done it already.
     store = Store.open(_db_path(args))
-    store.migrate()
+    try:
+        store.migrate()
+    except sqlite3.OperationalError:
+        pass  # daemon holds the write lock; schema is already current
     return store
 
 
@@ -110,7 +118,7 @@ def cmd_ingest(args) -> int:
     t1 = time.perf_counter()
     if not project_filter:
         pipeline.reconcile_projects(store)
-    built = pipeline.rebuild(store)
+    built = pipeline.rebuild(store, verbose=args.verbose)
     t2 = time.perf_counter()
     counts = store.counts()
     store.close()
@@ -581,7 +589,10 @@ def cmd_doctor(args) -> int:
     print("looma doctor\n")
     worst_ok = True
     for name, status, detail in checks:
-        print(f"  {sym[status]}  {name:18} {detail}")
+        lines = detail.split("\n")
+        print(f"  {sym[status]}  {name:18} {lines[0]}")
+        for line in lines[1:]:
+            print(f"  {'':24} {line}")
         if status == doctor.FAIL:
             worst_ok = False
     # concrete next step, so doctor ends with an action not just a status
@@ -737,7 +748,29 @@ def main(argv=None) -> int:
     # sit down, type `looma`, and see what you're on / what changed / what's next.
     if not argv:
         argv = ["today"]
-    args = build_parser().parse_args(argv)
+
+    # Extract --db / --verbose that appear before the subcommand so both
+    # `looma --db /path status` and `looma status --db /path` work.
+    top_db = None
+    top_verbose = False
+    filtered = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--db" and i + 1 < len(argv):
+            top_db = argv[i + 1]
+            i += 2
+        elif argv[i] in ("-v", "--verbose"):
+            top_verbose = True
+            i += 1
+        else:
+            filtered.append(argv[i])
+            i += 1
+
+    args = build_parser().parse_args(filtered)
+    if top_db:
+        args.db = top_db
+    if top_verbose:
+        args.verbose = True
     start = time.perf_counter()
     rc = args.func(args)
     if getattr(args, "verbose", False) and args.cmd not in ("ingest", "reprocess"):
