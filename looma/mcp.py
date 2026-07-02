@@ -7,6 +7,7 @@ Run via `looma mcp` (typically launched by the agent inside the project director
 
 import json
 import os
+import sqlite3
 import sys
 
 from . import config, identity, timeline
@@ -65,7 +66,10 @@ class _Server:
     def __init__(self):
         path = config.default_db_path()
         self.store = Store.open(path)
-        self.store.migrate()
+        try:
+            self.store.migrate()
+        except sqlite3.OperationalError:
+            pass  # daemon holds the write lock; schema already current
         self.vstore = get_vector_store(path)
 
     def _project(self, args):
