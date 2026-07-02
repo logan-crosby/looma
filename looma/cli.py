@@ -116,7 +116,7 @@ def cmd_ingest(args) -> int:
         store, limit=args.limit, project_filter=project_filter, verbose=args.verbose
     )
     t1 = time.perf_counter()
-    built = pipeline.rebuild(store)
+    built = pipeline.rebuild(store, verbose=args.verbose)
     t2 = time.perf_counter()
     counts = store.counts()
     store.close()

@@ -60,11 +60,17 @@ def ingest_messages(store: Store, projects_dir=None, limit=None, project_filter=
       for handle in adapter.discover():
         if limit is not None and sessions_seen >= limit:
             break
+        if verbose:
+            print(f"  {handle.source}: {handle.native_id} ...", end="", flush=True)
         try:
             events = list(adapter.read(handle))
         except Exception:
+            if verbose:
+                print(" failed", flush=True)
             continue
         if not events:
+            if verbose:
+                print(" empty", flush=True)
             continue
         # project identity from the session's first event that carries a cwd
         root = next((e.project_root for e in events if e.project_root), None)
@@ -98,6 +104,8 @@ def ingest_messages(store: Store, projects_dir=None, limit=None, project_filter=
             if store.insert_message(sid, ev) is not None:
                 new_msgs += 1
                 changed_projects.add(pid)
+        if verbose:
+            print(f" {len(events)} events", flush=True)
     store.commit()
     return {"sessions": sessions_seen, "new_messages": new_msgs, "skipped": skipped,
             "per_source": per_source, "changed_projects": sorted(changed_projects)}
@@ -126,7 +134,7 @@ def _wipe_project(store: Store, pid: int) -> None:
         c.execute(f"DELETE FROM {t} WHERE project_id=?", (pid,))
 
 
-def rebuild(store: Store, project_ids=None) -> dict:
+def rebuild(store: Store, project_ids=None, verbose=False) -> dict:
     """Regenerate derived data from stored messages. Idempotent.
 
     project_ids=None rebuilds everything (full wipe). A subset rebuilds only those
@@ -145,12 +153,20 @@ def rebuild(store: Store, project_ids=None) -> dict:
     store.commit()
 
     extractor = extractor_mod.get_extractor()  # chosen once per rebuild (auto-detects)
+    extractor_name = extractor.name
+    if verbose:
+        print(f"  Rebuild: {len(projects)} project(s), extractor={extractor_name}", flush=True)
     totals = {"work_items": 0, "candidates": 0, "promoted": 0}
-    for project in projects:
-        totals_p = _rebuild_project(store, project, extractor)
+    for i, project in enumerate(projects, 1):
+        if verbose:
+            print(f"  [{i}/{len(projects)}] {project['display_name']} ...", end="", flush=True)
+        totals_p = _rebuild_project(store, project, extractor, verbose=verbose)
         for k in totals:
             totals[k] += totals_p[k]
-    totals["extractor"] = extractor.name
+        if verbose:
+            print(f" {totals_p['work_items']} work items, {totals_p['candidates']} candidates"
+                  f", {totals_p['promoted']} promoted", flush=True)
+    totals["extractor"] = extractor_name
     totals["incremental"] = incremental
     store.commit()
     _populate_vectors(store)
@@ -189,22 +205,29 @@ def _make_sha_validator(store: Store, root):
     return validate
 
 
-def _rebuild_project(store: Store, project: dict, extractor=None) -> dict:
+def _rebuild_project(store: Store, project: dict, extractor=None, verbose=False) -> dict:
     pid = project["id"]
     root = project["root_path"]
     sessions = store.project_sessions(pid)
     validate = _make_sha_validator(store, root)
+
+    if verbose:
+        print(f" {len(sessions)} sessions", flush=True)
 
     # ---- per-session deterministic artifacts + work signals ----
     signals = []
     session_artifacts = {}
     session_msgs = {}
     for s in sessions:
+        if verbose:
+            print(f"    artifacts: session {s['id']} ...", end="", flush=True)
         msgs = store.session_messages(s["id"])
         session_msgs[s["id"]] = msgs
         arts = deterministic.session_artifacts(msgs, root, validate=validate)
         session_artifacts[s["id"]] = arts
         signals.append(wi_mod.build_session_signal(s, msgs, arts["files"]))
+        if verbose:
+            print(f" {len(arts['files'])} files, {len(arts['shas'])} commits", flush=True)
 
     builders = wi_mod.resolve(signals)
 
@@ -287,9 +310,14 @@ def _rebuild_project(store: Store, project: dict, extractor=None) -> dict:
         wi_id = session_to_wi.get(s["id"])
         model = s.get("agent_model")
         if _use_extractor:
+            if verbose:
+                print(f"    llm-extract: session {s['id']} ({len(session_msgs[s['id']])} msgs) ...",
+                      end="", flush=True)
             cands = [{"kind": mm["kind"], "title": mm["title"], "body": mm["title"],
                       "ts": None, "message_id": None}
                      for mm in _extractor.extract(session_msgs[s["id"]]).get("memories", [])]
+            if verbose:
+                print(f" {len(cands)} memories", flush=True)
         else:
             cands = cand_mod.extract_candidates(session_msgs[s["id"]])
         for c in cands:
